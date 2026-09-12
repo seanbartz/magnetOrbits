@@ -6,9 +6,12 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(_HERE, "..", "src"))
+sys.path.insert(0, os.path.join(_HERE, "..", "scans"))   # line_scan lives in survey.py
 
 from magdip import locked, scatter  # noqa: E402
+from survey import line_scan  # noqa: E402
 
 
 def plot_deflection(ax, b, chi, outcome, b_max_locked=None, s=0.6):
@@ -31,8 +34,6 @@ def figure(path, E, phi1, phi2, n=20_000, spans=None, **kw):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-
-    from survey import line_scan  # noqa: E402
 
     bm = locked.b_max(E)
     r = line_scan(E, phi1, phi2, n=n, **kw)

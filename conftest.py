@@ -1,4 +1,6 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+_ROOT = os.path.dirname(__file__)
+for _sub in ("src", "scans"):
+    sys.path.insert(0, os.path.join(_ROOT, _sub))

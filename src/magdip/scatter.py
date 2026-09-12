@@ -44,11 +44,24 @@ def initial_state(E, b, phi1=0.0, phi2=0.0, rho0=DEFAULT_RHO0, s1=0.0, s2=0.0):
     orientation, so for ``s_i != 0`` the angle is a phase referred to this particular
     ``rho0``.  See :func:`initial_state_total_energy` for the fixed-total-energy variant.
 
-    All arguments broadcast; the result is ``(8,)`` for scalars and ``(8, N)`` for arrays.
+    All arguments broadcast; the result is ``(8,)`` for scalars and ``(8, ...)`` for
+    arrays, with the broadcast parameter shape trailing the state axis.
+
+    Raises
+    ------
+    ValueError
+        if ``|b| > rho0`` (no such asymptotic state exists) or ``E <= 0``.
     """
     E, b, phi1, phi2, rho0, s1, s2 = np.broadcast_arrays(
         *[np.asarray(v, dtype=float)
           for v in (E, b, phi1, phi2, rho0, s1, s2)])
+    if np.any(E <= 0.0):
+        raise ValueError("translational energy E must be positive")
+    if np.any(np.abs(b) > rho0):
+        raise ValueError("|b| must not exceed rho0: no in-state exists with the "
+                         "trajectory starting inside its own impact parameter "
+                         "(max |b| = %g, rho0 = %g)"
+                         % (float(np.max(np.abs(b))), float(np.min(rho0))))
     v = np.sqrt(2.0 * E)
     x0 = np.sqrt(np.maximum(rho0 ** 2 - b ** 2, 0.0))
     y = np.zeros((dyn.NDIM,) + E.shape)
@@ -75,6 +88,23 @@ def initial_state_total_energy(E_total, b, phi1=0.0, phi2=0.0, rho0=DEFAULT_RHO0
     if np.any(E_trans <= 0.0):
         raise ValueError("spin kinetic energy exceeds the total energy")
     return initial_state(E_trans, b, phi1, phi2, rho0, s1, s2)
+
+
+def asymptotic_parameters(y):
+    """Recover ``(rho, E_trans, b)`` from a state, ignoring the spin energy.
+
+    ``E_trans = (p_rho**2 + (L/rho)**2)/2`` and ``b = L/sqrt(2 E_trans)``.  Exact for a
+    state built by :func:`initial_state`; for a state at finite ``rho`` it is the
+    osculating free-flight equivalent, which is what the flight-time and delay
+    bookkeeping needs.
+    """
+    y = np.asarray(y, dtype=float)
+    rho = y[IRHO]
+    L = y[IL]
+    E_trans = 0.5 * (y[IPR] ** 2 + (L / rho) ** 2)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        b = np.where(E_trans > 0.0, L / np.sqrt(2.0 * E_trans), 0.0)
+    return rho, E_trans, b
 
 
 def free_flight_time(E, b, rho0=DEFAULT_RHO0):
@@ -115,6 +145,13 @@ def run_trajectory(E, b, phi1=0.0, phi2=0.0, rho0=DEFAULT_RHO0,
     """
     if y0 is None:
         y0 = initial_state(E, b, phi1, phi2, rho0, s1, s2)
+    else:
+        # A supplied state is authoritative: re-derive the asymptotic parameters from
+        # it so that the free-flight time, the time delay and the timeout horizon
+        # describe the trajectory actually being integrated rather than whatever was
+        # passed for E and b.
+        y0 = np.asarray(y0, dtype=float)
+        rho0, E, b = asymptotic_parameters(y0)
     y0 = np.asarray(y0, dtype=float)
     if rho_escape is None:
         rho_escape = rho0
@@ -179,7 +216,10 @@ def run_batch(E, b, phi1=0.0, phi2=0.0, rho0=DEFAULT_RHO0,
     """Integrate a batch of scattering trajectories and return their observables.
 
     ``E, b, phi1, phi2, s1, s2`` broadcast against each other; ``E`` is the
-    translational energy (see :func:`initial_state`).  With ``regularized=True`` the
+    translational energy (see :func:`initial_state`).  Any broadcast shape is accepted
+    -- including two-dimensional sweeps such as ``phi1[:, None], phi2[None, :]`` -- and
+    every per-trajectory output is returned flat, with the broadcast shape under the
+    ``"shape"`` key so results can be reshaped (see :func:`reshape_results`).  With ``regularized=True`` the
     integration is done in Sundman time (see `magdip.regularize`), which is much
     cheaper for trajectories that approach collapse but costs a little accuracy on
     wide, fast fly-bys.
@@ -188,12 +228,16 @@ def run_batch(E, b, phi1=0.0, phi2=0.0, rho0=DEFAULT_RHO0,
     from . import regularize as reg
 
     y0 = initial_state(E, b, phi1, phi2, rho0, s1, s2)
-    if y0.ndim == 1:
-        y0 = y0[:, None]
+    param_shape = y0.shape[1:]
+    # any broadcast shape is flattened to a single column axis for the integrator;
+    # `param_shape` is returned so a multi-dimensional sweep can be reshaped back
+    y0 = y0.reshape(dyn.NDIM, -1)
     N = y0.shape[1]
-    Eb, bb = np.broadcast_arrays(np.asarray(E, float), np.asarray(b, float))
-    Eb = np.broadcast_to(Eb, (N,)).ravel()
-    bb = np.broadcast_to(bb, (N,)).ravel()
+    Eb = np.broadcast_to(np.asarray(E, float), param_shape).reshape(-1)
+    bb = np.broadcast_to(np.asarray(b, float), param_shape).reshape(-1)
+    if N == 1 and Eb.size == 0:      # all-scalar inputs
+        Eb = np.atleast_1d(np.asarray(E, float))
+        bb = np.atleast_1d(np.asarray(b, float))
 
     if rho_escape is None:
         rho_escape = rho0
@@ -207,19 +251,21 @@ def run_batch(E, b, phi1=0.0, phi2=0.0, rho0=DEFAULT_RHO0,
     if regularized:
         q = reg.DEFAULT_Q if q is None else q
         z0 = reg.lift(y0)
-        tau_max = float(np.max(t_max))   # one horizon for the whole batch, in tau
-        state = {"E0": E0}
+        # per-trajectory horizons, sliced alongside E0 when columns are retired, so a
+        # trajectory's classification never depends on which others share its batch
+        state = {"E0": E0, "tau_max": np.broadcast_to(t_max, (N,)).astype(float)}
 
         def build():
             f = reg.make_rhs(state["E0"], q=q)
             evs = [itg.Event(lambda t, z: z[IRHO] - rho_capture, -1, COLLAPSED),
                    itg.Event(lambda t, z: z[IRHO] - rho_escape * (1.0 + 1e-9), +1,
                              ESCAPED),
-                   itg.Event(lambda t, z: z[reg.ITAU] - tau_max, +1, TIMEOUT)]
+                   itg.Event(lambda t, z: z[reg.ITAU] - state["tau_max"], +1, TIMEOUT)]
             return f, evs
 
         def rebind(keep):
             state["E0"] = state["E0"][keep]
+            state["tau_max"] = state["tau_max"][keep]
             return build()
 
         f, evs = build()
@@ -250,5 +296,23 @@ def run_batch(E, b, phi1=0.0, phi2=0.0, rho0=DEFAULT_RHO0,
         "spin_fraction": spin_fraction(y_end),
         "L_end": y_end[IL],
         "nsteps": res["nsteps"], "nrejected": res["nrejected"],
-        "b": bb, "E": Eb,
+        "b": bb, "E": Eb, "shape": param_shape,
     }
+
+
+def reshape_results(r):
+    """Reshape a :func:`run_batch` result's per-trajectory columns to the sweep shape.
+
+    ``run_batch`` always returns flat ``(N,)`` columns; this restores the broadcast
+    shape of the inputs, which is what a two-dimensional sweep wants.
+    """
+    shape = tuple(r["shape"])
+    if not shape:
+        return r
+    flat = ("outcome", "escaped", "collapsed", "chi", "delay", "t_end", "E0", "J0",
+            "dE", "dJ", "spin_fraction", "L_end", "nsteps", "nrejected", "b", "E")
+    out = dict(r)
+    for k in flat:
+        if k in out:
+            out[k] = np.asarray(out[k]).reshape(shape)
+    return out

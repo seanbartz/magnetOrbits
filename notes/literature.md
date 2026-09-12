@@ -9,6 +9,32 @@ demonstration.  The present repo strips the contact force and the damping, which
 makes the problem universal (see `notes/derivation.md`: all material parameters drop out).
 PDF and LaTeX source are under `paper/`.
 
+### Possible erratum in the parent paper
+
+A code review of PR #1 flagged the sentence following the kinetic-energy ratio
+(`arxivVersion.tex` line 209), and the algebra appears to support it.  The paper gives
+
+    K_f/K_i = (1/2beta) (b/R)^2
+
+and then states "the final kinetic energy exceeds the initial when `b/R > 1/sqrt(2 beta)`".
+But `K_f/K_i > 1` requires `(b/R)^2 > 2 beta`, i.e.
+
+    b/R > sqrt(2 beta)          [not 1/sqrt(2 beta)]
+
+With the barbell value `beta = 14/5` the threshold is `sqrt(5.6) = 2.366`, not
+`1/sqrt(5.6) = 0.423` — a difference that matters, since the reported simulations run out
+to `b/R = 4.65` and therefore straddle the correct threshold rather than lying entirely
+above the incorrect one.  The displayed equation itself is fine; only the inequality that
+interprets it is inverted.
+
+**The archival source under `paper/` is deliberately left unmodified** — it is a verbatim
+copy of the arXiv submission, kept for reference.  Worth checking independently and, if
+confirmed, folding into any revision.
+
+(The same review also reported that `\Dot`/`\Ddot` are undefined and prevent the paper
+from compiling.  That is incorrect: they are amsmath's `\mathpalette` accent forms, and
+`pdflatex arxivVersion.tex` completes cleanly from `paper/source/`.)
+
 **Edwards, Riffe, Ji & Booth, Am. J. Phys. 85, 130 (2017)** — establishes that a uniformly
 magnetized sphere is *exactly* a point dipole for external fields and forces.  This is what
 licenses the point-dipole treatment here, and also why `I` is an independent parameter

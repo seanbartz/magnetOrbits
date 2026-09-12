@@ -1,6 +1,7 @@
 # Findings so far
 
-Status: plan steps 1–4 complete.  54 tests pass (`python -m pytest tests -q`).
+Status: plan steps 1–4 complete; the full test suite passes
+(`python -m pytest tests -q`).
 Everything below is from the dimensionless system; `btil` is in units of
 `a = sqrt(2I/m)` and `Etil = E a^3 / C`.
 
@@ -28,7 +29,7 @@ The whole orientational dependence is one function,
 ## 2. Locked-dipole baseline  ✔ reproduced analytically and numerically
 
     U_eff = L^2/(2 rho^2) - 1/rho^3,  rho* = 3/L^2,  U_eff(rho*) = L^6/54
-    btil_max = (27/4)^(1/6) Etil^(-1/3) = 1.35721 Etil^(-1/3)
+    btil_max = (27/4)^(1/6) Etil^(-1/3) = 1.374730 Etil^(-1/3)
 
 Numerically, integrating the locked EOM gives capture at `0.999 btil_max` and escape at
 `1.001 btil_max` for every `Etil` tested.  The closed-form deflection quadrature agrees

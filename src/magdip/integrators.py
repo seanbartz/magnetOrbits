@@ -241,10 +241,23 @@ GL_TABLEAUX = {
 }
 
 
-def gauss_legendre_step(f, t, y, h, stages=2, tol=1e-13, max_iter=100):
-    """One symplectic Gauss-Legendre step, solved by fixed-point iteration."""
+class StageSolveError(RuntimeError):
+    """The implicit stage equations did not converge within ``max_iter``."""
+
+
+def gauss_legendre_step(f, t, y, h, stages=2, tol=1e-13, max_iter=100, strict=True):
+    """One symplectic Gauss-Legendre step, solved by fixed-point iteration.
+
+    The scheme is symplectic and of order ``2*stages`` *only* if the implicit stage
+    equations are actually solved, so a fixed-point iteration that runs out of
+    iterations raises :class:`StageSolveError` rather than silently returning the last
+    iterate as though it were a valid step.  Pass ``strict=False`` to accept it anyway
+    (and lose both guarantees).  Fixed-point iteration converges geometrically for
+    ``h`` below roughly the inverse Lipschitz constant; if it fails, reduce ``h``.
+    """
     A, b, c = GL_TABLEAUX[stages]
     k = [f(t, y).copy() for _ in range(stages)]
+    delta = np.inf
     for _ in range(max_iter):
         k_new = []
         for i in range(stages):
@@ -256,6 +269,12 @@ def gauss_legendre_step(f, t, y, h, stages=2, tol=1e-13, max_iter=100):
         k = k_new
         if delta < tol:
             break
+    else:
+        if strict:
+            raise StageSolveError(
+                "Gauss-Legendre stage equations did not converge in %d iterations "
+                "at h=%g (residual %.3e > tol %.3e); reduce the step size."
+                % (max_iter, h, delta, tol))
     return y + h * sum(bi * ki for bi, ki in zip(b, k))
 
 

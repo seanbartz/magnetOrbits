@@ -5,9 +5,11 @@ and rotating, no dissipation, no contact force.  This is the conservative, unive
 version of the collision studied in [Bartz & Shaw, arXiv:2212.00876](https://arxiv.org/abs/2212.00876),
 with the damped-spring contact force stripped away.
 
-Closest prior work (Haugen & Edwards 2020; Schmelcher group 2016) keeps the dipole
-**centres fixed**.  Here both centres and both orientations are free, so orbital angular
-momentum `L` is *not* conserved — only `J = L + s1 + s2` is.  That is the crux: a
+The prior work gathered so far (Haugen & Edwards 2020; Schmelcher group 2016) keeps the
+dipole **centres fixed** — though this has *not* been checked against a systematic
+literature search, and should be before any write-up (see
+[notes/literature.md](notes/literature.md)).  Here both centres and both orientations are
+free, so orbital angular momentum `L` is *not* conserved — only `J = L + s1 + s2` is.  That is the crux: a
 trajectory can dump orbital angular momentum into spin and pass *under* the centrifugal
 barrier that would otherwise reflect it.
 
@@ -19,9 +21,11 @@ Non-dimensionalizing on the radius of gyration `a = sqrt(2I/m)` and the coupling
     H = p_rho^2/2 + L^2/(2 rho^2) + (s1^2 + s2^2)/2 - W(a1, a2)/(2 rho^3)
     W = 2 cos a1 cos a2 - sin a1 sin a2,      a_i = phi_i - theta
 
-has **no free parameters at all**.  The entire problem is the four-dimensional family of
-initial conditions `(Etil, btil, phi1_0, phi2_0)`, and `Etil ∝ E I^(3/2)` is the
-adiabaticity parameter.  See [notes/derivation.md](notes/derivation.md).
+has **no free parameters at all**, and `Etil ∝ E I^(3/2)` is the adiabaticity parameter.
+For a *non-rotating* in-state the problem is the four-dimensional family
+`(Etil, btil, phi1_0, phi2_0)`; allowing the magnets to arrive already spinning adds
+`s1_0, s2_0`, which are genuine extra parameters and not small ones (see
+[notes/findings.md](notes/findings.md) §5).  See [notes/derivation.md](notes/derivation.md).
 
 This is verified numerically, not just on paper: `tests/test_dimensionless.py` integrates
 three physically different dipole pairs (different masses, inertias, moments, and even a
@@ -45,7 +49,7 @@ onto one dimensionless trajectory.
 ## Usage
 
 ```bash
-python -m pytest tests -q              # 54 tests, ~13 s
+python -m pytest tests -q              # full suite, ~40 s
 python -m pytest tests -q -m slow      # the physics-validation subset
 ```
 
@@ -54,7 +58,7 @@ from magdip import scatter, locked
 import numpy as np
 
 b = np.linspace(0.1, 8.0, 20_000)
-r = scatter.run_batch(Etil=0.1, b=b, phi1=0.7, phi2=-2.1, regularized=True)
+r = scatter.run_batch(E=0.1, b=b, phi1=0.7, phi2=-2.1, regularized=True)
 r["escaped"], r["chi"], r["delay"], r["spin_fraction"]
 
 locked.b_max(0.1)          # 2.9618 -- the central-force baseline

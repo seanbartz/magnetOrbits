@@ -1,12 +1,19 @@
 """Chunked, checkpointed, resumable parameter sweeps.
 
 A scan is a flat list of initial-condition tuples split into fixed-size chunks.  Each
-finished chunk is appended to an ``.npz`` checkpoint, so a run can be killed and
-restarted and will pick up where it left off.  Chunks are independent, so they can be
-spread over processes.
+finished chunk is written as its own small shard under ``<path>.parts/``, so the cost of
+checkpointing is proportional to the chunk just completed rather than to the whole scan;
+the shards are consolidated into a single ``.npz`` when the sweep finishes.  A run can be
+killed at any point and restarted, and will pick up where it left off.
+
+Every checkpoint carries a fingerprint of the initial conditions and integration
+settings that produced it.  Reusing an output path for a *different* sweep is refused
+rather than silently merging incompatible results.
 """
 from __future__ import annotations
 
+import glob
+import hashlib
 import os
 import sys
 import time
@@ -22,10 +29,24 @@ FIELDS = ("outcome", "chi", "delay", "t_end", "spin_fraction", "L_end", "dE", "d
           "nsteps")
 
 
+class CheckpointMismatch(RuntimeError):
+    """Raised when an existing checkpoint was produced by a different sweep."""
+
+
 def run_chunk(E, b, phi1, phi2, **kw):
     """Integrate one chunk and return the recorded columns as a dict of arrays."""
     r = scatter.run_batch(E, b, phi1, phi2, **kw)
     return {k: np.asarray(r[k]) for k in FIELDS}
+
+
+def _fingerprint(E, b, phi1, phi2, shape, kw):
+    """Stable hash of everything that determines the results."""
+    h = hashlib.sha256()
+    for a in (E, b, phi1, phi2):
+        h.update(np.ascontiguousarray(a, dtype=np.float64).tobytes())
+    h.update(repr(tuple(shape)).encode())
+    h.update(repr(sorted((str(k), repr(v)) for k, v in kw.items())).encode())
+    return h.hexdigest()
 
 
 class Scan(object):
@@ -41,23 +62,65 @@ class Scan(object):
         self.chunk = int(chunk)
         self.kw = kw
         self.meta = dict(meta or {})
+        self.fingerprint = _fingerprint(self.E, self.b, self.phi1, self.phi2,
+                                        self.shape, kw)
 
     # -- checkpointing --------------------------------------------------------
-    def _load(self):
-        if not os.path.exists(self.path):
-            data = {k: np.full(self.n, np.nan) for k in FIELDS}
-            data["outcome"] = np.full(self.n, -1, dtype=np.int16)
-            data["done"] = np.zeros(self.n, dtype=bool)
-            return data
-        z = np.load(self.path, allow_pickle=False)
-        return {k: z[k] for k in list(FIELDS) + ["done"]}
+    @property
+    def parts_dir(self):
+        return self.path + ".parts"
 
-    def _save(self, data):
+    def _blank(self):
+        data = {k: np.full(self.n, np.nan) for k in FIELDS}
+        data["outcome"] = np.full(self.n, -1, dtype=np.int16)
+        data["done"] = np.zeros(self.n, dtype=bool)
+        return data
+
+    def _check_fingerprint(self, stored, source):
+        if str(stored) != self.fingerprint:
+            raise CheckpointMismatch(
+                "%s was produced by a different sweep (fingerprint %s..., expected "
+                "%s...).\nThe initial conditions or integration settings have changed. "
+                "Write to a new --out path, or delete the stale checkpoint."
+                % (source, str(stored)[:12], self.fingerprint[:12]))
+
+    def _load(self):
+        """Reassemble progress from the consolidated file and/or the shards."""
+        data = self._blank()
+        if os.path.exists(self.path):
+            z = np.load(self.path, allow_pickle=False)
+            self._check_fingerprint(z["fingerprint"], self.path)
+            for k in list(FIELDS) + ["done"]:
+                data[k] = z[k]
+        for shard in sorted(glob.glob(os.path.join(self.parts_dir, "chunk_*.npz"))):
+            z = np.load(shard, allow_pickle=False)
+            self._check_fingerprint(z["fingerprint"], shard)
+            a, zz = int(z["start"]), int(z["stop"])
+            for k in FIELDS:
+                data[k][a:zz] = z[k]
+            data["done"][a:zz] = True
+        return data
+
+    def _save_shard(self, a, z, out):
+        """Write one chunk. Cost is O(chunk), not O(total)."""
+        os.makedirs(self.parts_dir, exist_ok=True)
+        tmp = os.path.join(self.parts_dir, "chunk_%09d_%09d.tmp.npz" % (a, z))
+        np.savez(tmp, start=a, stop=z, fingerprint=self.fingerprint, **out)
+        os.replace(tmp, os.path.join(self.parts_dir,
+                                     "chunk_%09d_%09d.npz" % (a, z)))
+
+    def _consolidate(self, data):
+        """Write the single-file checkpoint and drop the shards."""
         tmp = self.path + ".tmp.npz"   # np.savez appends .npz unless already present
         np.savez_compressed(tmp, E=self.E, b=self.b, phi1=self.phi1, phi2=self.phi2,
-                            shape=np.array(self.shape), **data,
+                            shape=np.array(self.shape),
+                            fingerprint=self.fingerprint, **data,
                             **{"meta_" + k: np.array(v) for k, v in self.meta.items()})
         os.replace(tmp, self.path)
+        for shard in glob.glob(os.path.join(self.parts_dir, "chunk_*.npz")):
+            os.remove(shard)
+        if os.path.isdir(self.parts_dir) and not os.listdir(self.parts_dir):
+            os.rmdir(self.parts_dir)
 
     # -- driving --------------------------------------------------------------
     def run(self, workers=1, verbose=True):
@@ -66,6 +129,8 @@ class Scan(object):
                 for s in range(0, self.n, self.chunk)]
         todo = [(a, z) for a, z in todo if not data["done"][a:z].all()]
         if not todo:
+            if not os.path.exists(self.path):
+                self._consolidate(data)
             if verbose:
                 print("scan already complete: %s" % self.path)
             return self.results()
@@ -74,13 +139,13 @@ class Scan(object):
         if workers > 1:
             import multiprocessing as mp
             with mp.Pool(workers) as pool:
-                jobs = [pool.apply_async(run_chunk,
-                                         (self.E[a:z], self.b[a:z], self.phi1[a:z],
-                                          self.phi2[a:z]), self.kw)
-                        for a, z in todo]
-                for (a, z), job in zip(todo, jobs):
-                    self._store(data, a, z, job.get())
-                    self._save(data)
+                jobs = [(a, z, pool.apply_async(
+                    run_chunk, (self.E[a:z], self.b[a:z], self.phi1[a:z],
+                                self.phi2[a:z]), self.kw)) for a, z in todo]
+                for a, z, job in jobs:
+                    out = job.get()
+                    self._store(data, a, z, out)
+                    self._save_shard(a, z, out)
                     if verbose:
                         self._report(data, t0)
         else:
@@ -88,9 +153,10 @@ class Scan(object):
                 out = run_chunk(self.E[a:z], self.b[a:z], self.phi1[a:z],
                                 self.phi2[a:z], **self.kw)
                 self._store(data, a, z, out)
-                self._save(data)
+                self._save_shard(a, z, out)
                 if verbose:
                     self._report(data, t0)
+        self._consolidate(data)
         return self.results()
 
     def _store(self, data, a, z, out):
@@ -124,4 +190,5 @@ def load(path):
     for k in ("E", "b", "phi1", "phi2"):
         out[k] = z[k].reshape(shape)
     out["meta"] = {k[5:]: z[k] for k in z.files if k.startswith("meta_")}
+    out["fingerprint"] = str(z["fingerprint"]) if "fingerprint" in z.files else None
     return out

@@ -3,7 +3,8 @@
 Usage::
 
     python scans/deflection_scan.py --E 0.1 --n 20000 --out data/chi_E0.1.npz
-    python scans/deflection_scan.py --E 0.1 --zoom 3.20 3.24 --n 20000 --out ...
+    python scans/deflection_scan.py --E 0.1 --bmin 3.20 --bmax 3.24 --n 20000 \
+        --out data/chi_E0.1_zoom.npz
 """
 from __future__ import annotations
 

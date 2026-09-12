@@ -201,7 +201,7 @@ With `W ≡ 2`, `U = −1/ρ³` and
 Capture (fall to the centre) iff `E > L⁶/54`, i.e. `L < L_max = (54 Ẽ)^{1/6}`.
 With `L = v b̃ = √(2Ẽ) b̃`,
 
-    **b̃_max = (27/4)^{1/6} Ẽ^{−1/3} ≈ 1.3572 Ẽ^{−1/3}**
+    **b̃_max = (27/4)^{1/6} Ẽ^{−1/3} ≈ 1.374730 Ẽ^{−1/3}**
 
 Planar ("cross section" = a length):   σ̃ = 2 b̃_max ∝ Ẽ^{−1/3}
 3-D analogue (for reference):          σ = π b_max² ∝ E^{−2/3}   (Langevin/locked-dipole)
