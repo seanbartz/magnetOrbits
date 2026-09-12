@@ -1,0 +1,113 @@
+\providecommand{\href}[2]{#2}\begingroup\raggedright\begin{thebibliography}{10}
+
+\bibitem{Lindn2018}
+J.~Lind{\'{e}}n, J.~Slotte, and K.-M. K\"{a}llman, ``Demonstrating the
+  conservation of angular momentum using spherical magnets,''
+  \href{http://dx.doi.org/10.1119/1.5002548}{{\em American Journal of Physics}
+  {\bfseries 86} no.~1, (Jan., 2018) 25--30}.
+  \url{https://doi.org/10.1119/1.5002548}.
+
+\bibitem{Weber2020}
+J.~Weber and T.~Wilhelm, ``The benefit of computational modelling in physics
+  teaching: a historical overview,''
+  \href{http://dx.doi.org/10.1088/1361-6404/ab7a7f}{{\em European Journal of
+  Physics} {\bfseries 41} no.~3, (Apr., 2020) 034003}.
+  \url{https://doi.org/10.1088/1361-6404/ab7a7f}.
+
+\bibitem{Edwards2017a}
+B.~F. Edwards, D.~M. Riffe, J.-Y. Ji, and W.~Booth, ``Interactions between
+  uniformly magnetized spheres,'' {\em American Journal of Physics} {\bfseries
+  85} (2017) 130--134.
+
+\bibitem{Griffiths_EM}
+D.~J. Griffiths, \href{http://dx.doi.org/1108420419}{{\em {Introduction to
+  electrodynamics; 4th ed.}}}
+\newblock Pearson, Boston, MA, 2013.
+\newblock \url{https://cds.cern.ch/record/1492149}.
+\newblock Re-published by Cambridge University Press in 2017.
+
+\bibitem{Greene1971}
+J.~B. Greene and F.~G. Karioris, ``Force on a magnetic dipole,'' {\em American
+  Journal of Physics} {\bfseries 39} (1971) 172--175.
+
+\bibitem{Boyer1988}
+T.~H. Boyer, ``The force on a magnetic dipole,'' {\em American Journal of
+  Physics} {\bfseries 56} (1988) 688--692.
+
+\bibitem{Yung1998}
+K.~W.~T. Yung, P.~B. Landecker, and D.~D. Villani, ``An analytic solution for
+  the force between two magnetic dipoles,'' {\em Physical Separation in Science
+  and Engineering} {\bfseries 9} (1998) 39--52.
+
+\bibitem{meyers_chawla_2008}
+M.~A. Meyers and K.~K. Chawla,
+  \href{http://dx.doi.org/10.1017/CBO9780511810947}{{\em Mechanical Behavior of
+  Materials}}.
+\newblock Cambridge University Press, 2~ed., 2008.
+
+\bibitem{Nagurka}
+M.~Nagurka and S.~Huang, \href{http://dx.doi.org/10.23919/ACC.2004.1383652}{``A
+  mass-spring-damper model of a bouncing ball,''} in {\em Proceedings of the
+  2004 American Control Conference}, vol.~1, pp.~499--504 vol.1.
+\newblock 2004.
+
+\bibitem{Muller2011}
+P.~M\"uller and T.~P\"oschel, ``Two-ball problem revisited: Limitations of
+  event-driven modeling,''
+  \href{http://dx.doi.org/10.1103/PhysRevE.83.041304}{{\em Phys. Rev. E}
+  {\bfseries 83} (Apr, 2011) 041304}.
+  \url{https://link.aps.org/doi/10.1103/PhysRevE.83.041304}.
+
+\bibitem{Becker2008}
+V.~Becker, T.~Schwager, and T.~P\"oschel, ``Coefficient of tangential
+  restitution for the linear dashpot model,''
+  \href{http://dx.doi.org/10.1103/PhysRevE.77.011304}{{\em Phys. Rev. E}
+  {\bfseries 77} (Jan, 2008) 011304}.
+  \url{https://link.aps.org/doi/10.1103/PhysRevE.77.011304}.
+
+\bibitem{Bartz2022b}
+S.~P. Bartz, ``Coefficient of restitution of a linear dashpot on a rigid
+  surface,'' 2022.
+\newblock \url{https://arxiv.org/abs/2204.10917}.
+
+\bibitem{magdata}
+``Neo iron boron magnetic materials properties data.''
+\newblock
+  \url{https://www.intemag.com/neo-iron-boron-magnetic-materials-properties-data#1}.
+
+\bibitem{magdata2}
+``Neodymium - history, properties and applications.''
+\newblock \url{https://www.azom.com/properties.aspx?ArticleID=1595}.
+
+\bibitem{Gonazlez2016}
+M.~I. Gonz{\'{a}}lez, ``Forces between permanent magnets: experiments and
+  model,'' \href{http://dx.doi.org/10.1088/1361-6404/38/2/025202}{{\em European
+  Journal of Physics} {\bfseries 38} no.~2, (Dec., 2016) 025202}.
+  \url{https://doi.org/10.1088/1361-6404/38/2/025202}.
+
+\bibitem{Cromer1981}
+A.~Cromer, ``Stable solutions using the euler approximation,''
+  \href{http://dx.doi.org/10.1119/1.12478}{{\em American Journal of Physics}
+  {\bfseries 49} no.~5, (1981) 455--459}.
+  \url{https://doi.org/10.1119/1.12478}.
+
+\bibitem{glowscript}
+``Web vpython.''
+\newblock \url{https://glowscript.org/}.
+
+\bibitem{Haugen2020}
+P.~Haugen and B.~F. Edwards, ``Dynamics of two freely rotating dipoles,'' {\em
+  American Journal of Physics} {\bfseries 88} (2020) 365--370.
+
+\bibitem{Edwards2017b}
+B.~F. Edwards and J.~M. Edwards, ``Periodic nonlinear sliding modes for two
+  uniformly magnetized spheres.,'' {\em Chaos} {\bfseries 27 5} (2017) 053107.
+
+\bibitem{Schwager2008}
+T.~Schwager, V.~Becker, and T.~P\"{o}schel, ``Coefficient of tangential
+  restitution for viscoelastic spheres,''
+  \href{http://dx.doi.org/10.1140/epje/i2007-10356-3}{{\em The European
+  Physical Journal E} {\bfseries 27} no.~1, (Aug., 2008) 107--114}.
+  \url{https://doi.org/10.1140/epje/i2007-10356-3}.
+
+\end{thebibliography}\endgroup
