@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "magdip"
+version = "0.1.0"
+description = "Conservative chaotic scattering of two free planar magnetic dipoles"
+requires-python = ">=3.8"
+dependencies = ["numpy>=1.20", "scipy>=1.7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: longer physics-validation runs"]
