@@ -10,19 +10,25 @@ What it computes
 ----------------
 For fixed E_tilde and asymptotic moment directions m1, m2, the outcome is a function of b
 alone: "contact" (reaches r = 2) or "escape" (rigorous criterion). capture.find_capture_edge
-assumes a single contact interval; here nothing is assumed:
+assumes a single contact interval; here the number of intervals is not assumed, but the
+resolution is (see "one transition per scan cell" below):
 
   1. scan b on a uniform grid over [b_min, b_max] (n_scan points);
-  2. bisect every adjacent pair whose outcomes differ, to relative width rel_tol;
+  2. bisect every adjacent pair of scan points whose outcomes differ, to relative width
+     rel_tol -- one edge per such pair;
   3. report the sorted edges, the contact intervals they bound, their total length
      ("capture measure" over [b_min, b_max]), the outer edge (largest contact->escape
      edge) and the interval count.
 
 Limits of the method (report, don't hide)
 -----------------------------------------
-* Structure finer than the scan spacing between two grid points with EQUAL outcomes is
-  invisible. Interval counts are lower bounds; the scan-refinement check in the tests
-  and `interval counts stable under refinement` in PLAN 6b is what makes them meaningful.
+* ONE TRANSITION PER SCAN CELL is assumed. A cell whose end outcomes differ may contain any
+  odd number of transitions and yields one edge; a cell whose ends agree may hide any even
+  number. No finite sampling can exclude this, so edges and interval counts are those
+  resolved at the scan spacing (b_max - b_min)/(n_scan - 1), and interval counts are lower
+  bounds. The assumption is tested, not trusted: a map is accepted only if refining the scan
+  (n_scan x2 on sampled points in analysis/map_convergence.py; x4 on every point of the
+  production map, PLAN stage 7) leaves every profile's structure unchanged.
 * The measure is over [b_min, b_max], not [0, inf): b < b_min is not sampled (b = 0 need
   not collide: side-by-side parallel moments repel), and contact at b_max is flagged via
   `contact_at_scan_top` rather than silently truncated.

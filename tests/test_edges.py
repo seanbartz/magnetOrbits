@@ -217,3 +217,19 @@ def test_sweep_limit_zero_runs_nothing():
         assert not points.exists() or points.read_text() == ""
     finally:
         shutil.rmtree(root / "results" / name, ignore_errors=True)
+
+
+def test_map_convergence_rejects_incomplete_map(tmp_path):
+    """analysis/map_convergence.py exits 1 on a partial map instead of sampling what exists."""
+    import subprocess
+    import sys
+    (tmp_path / "meta.json").write_text(json.dumps({"n_phi": 4, "fundamental": False, "git_hash": "x" * 8,
+                                                    "git_dirty": False, "settings": {"energy": 0.03}}))
+    rec = {"i": 0, "j": 0, "phi1": 0.0, "phi2": 0.0, "outer_edge": 5.0, "capture_measure": 5.0,
+           "n_intervals": 1, "n_timeouts": 0, "edges": [5.0], "edge_kinds": ["ce"],
+           "contact_at_scan_top": False, "unresolved": []}
+    (tmp_path / "points.jsonl").write_text(json.dumps(rec) + "\n")
+    script = Path(__file__).resolve().parents[1] / "analysis" / "map_convergence.py"
+    out = subprocess.run([sys.executable, str(script), str(tmp_path), "--workers", "1"],
+                         capture_output=True, text=True)
+    assert out.returncode == 1 and "INCOMPLETE" in out.stdout
