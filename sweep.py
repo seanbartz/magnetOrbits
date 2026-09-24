@@ -127,7 +127,7 @@ def main():
     # 3. Resume: skip points already computed successfully (failed points are retried).
     done = completed_points(points_file)
     pending = [(i, j) for i, j in pairs if (i, j) not in done]
-    if args.limit:
+    if args.limit is not None:           # --limit 0 means "run nothing" (e.g. just write meta.json)
         pending = pending[:args.limit]
     print(f"{len(pairs)} points, {len(done)} done, running {len(pending)} on {args.workers} workers "
           f"(git {head[:8]}{', DIRTY' if dirty else ''})")

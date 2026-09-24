@@ -185,3 +185,35 @@ def test_symmetry_check_compares_edge_kinds():
 def test_dirty_check_covers_runtime_inputs():
     import sweep
     assert {"physics", "sweep.py", "tests/published"} <= set(sweep.RUNTIME_PATHS)
+
+
+def test_map_checks_rejects_incomplete_map(tmp_path):
+    """analysis/map_checks.py exits 1 on a partial map instead of reporting PASS."""
+    import subprocess
+    import sys
+    n = 4
+    (tmp_path / "meta.json").write_text(json.dumps({"n_phi": n, "fundamental": False, "git_hash": "x" * 8,
+                                                    "git_dirty": False, "settings": {"energy": 0.03}}))
+    rec = {"i": 0, "j": 0, "outer_edge": 5.0, "capture_measure": 5.0, "n_intervals": 1, "n_timeouts": 0,
+           "edges": [5.0], "edge_kinds": ["ce"], "contact_at_scan_top": False, "unresolved": []}
+    (tmp_path / "points.jsonl").write_text(json.dumps(rec) + "\n")
+    script = Path(__file__).resolve().parents[1] / "analysis" / "map_checks.py"
+    out = subprocess.run([sys.executable, str(script), str(tmp_path)], capture_output=True, text=True)
+    assert out.returncode == 1 and "INCOMPLETE" in out.stdout
+
+
+def test_sweep_limit_zero_runs_nothing():
+    import shutil
+    import subprocess
+    import sys
+    root = Path(__file__).resolve().parents[1]
+    name = "pytest_limit0"
+    try:
+        out = subprocess.run([sys.executable, "sweep.py", "--name", name, "--n-phi", "4", "--limit", "0",
+                              "--workers", "1"], cwd=root, capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+        assert "running 0" in out.stdout
+        points = root / "results" / name / "points.jsonl"
+        assert not points.exists() or points.read_text() == ""
+    finally:
+        shutil.rmtree(root / "results" / name, ignore_errors=True)

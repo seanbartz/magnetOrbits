@@ -28,7 +28,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from physics import central                     # noqa: E402
-from physics.edges import load_map, symmetry_orbit   # noqa: E402
+from physics.edges import fundamental_domain, load_map, symmetry_orbit   # noqa: E402
 
 EDGE_RTOL = 2e-6
 
@@ -103,6 +103,15 @@ def main():
           f"{' (dirty)' if data['meta']['git_dirty'] else ''}")
     print(f"points: {len(data['records'])} computed, {len(data['errors'])} failed, "
           f"{int(np.isnan(data['outer_edge']).sum())} missing/no-capture")
+
+    # A partial run (--limit, failed points) must not pass or be plotted: the symmetry check only
+    # compares partners that exist, so missing points would otherwise go unnoticed.
+    expected = {(i, j) for i in range(n) for j in range(n)} if full_torus else set(fundamental_domain(n))
+    missing = expected - set(data["records"])
+    if missing or data["errors"]:
+        print(f"INCOMPLETE map: {len(missing)} of {len(expected)} expected points missing, "
+              f"{len(data['errors'])} failed (e.g. {sorted(missing)[:5]}); resume the sweep first  -> FAIL")
+        raise SystemExit(1)
 
     if full_torus:
         worst, mismatches, compared = symmetry_check(data)
