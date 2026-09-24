@@ -47,7 +47,8 @@ def parse_args():
     p.add_argument("--preset", choices=sorted(PRESETS), help="named moment configuration")
     p.add_argument("--m1", type=float, nargs=3, help="moment direction of sphere 1 (lab frame)")
     p.add_argument("--m2", type=float, nargs=3, help="moment direction of sphere 2 (lab frame)")
-    p.add_argument("--w1", type=float, nargs=3, default=(0, 0, 0), help="initial spin of sphere 1")
+    p.add_argument("--w1", type=float, nargs=3, default=(0, 0, 0),
+                   help="initial spin of sphere 1 (nonzero: moments then refer to r0, not t -> -inf)")
     p.add_argument("--w2", type=float, nargs=3, default=(0, 0, 0), help="initial spin of sphere 2")
     p.add_argument("--beta", type=float, default=0.4, help="I = beta m R^2 (0.4 solid sphere)")
     p.add_argument("--r0", type=float, default=1000.0, help="start (and stop) radius")
@@ -72,13 +73,16 @@ def main():
         m2, kappa = args.m2, None
 
     params = SphereParams(inertia_factor=args.beta)
+    # A spinning in-state has no asymptotic orientation: moments and spins then refer to r0.
+    spinning = any(args.w1) or any(args.w2)
     res = run_trajectory(args.energy, args.b, m1, m2, w1=args.w1, w2=args.w2, params=params,
                          start_radius=args.r0, stop=args.stop, rtol=args.rtol, atol=args.atol,
-                         keep_solution=args.plot)
+                         asymptotic_correction=not spinning, keep_solution=args.plot)
 
     print(f"E_tilde = {args.energy:g}   b/R = {args.b:g}   m1 = {np.round(m1, 6)}   m2 = {np.round(m2, 6)}")
     print(f"beta = {args.beta:g} (I_tilde = {params.inertia_tilde:g})   r0 = {args.r0:g}   "
           f"rtol = {args.rtol:g}   atol = {args.atol:g}")
+    print("in-state moments refer to " + ("r0 (spinning in-state)" if spinning else "t -> -inf"))
     print("-" * 72)
     print(f"outcome                 {res['outcome']}")
     print(f"closest approach r_min  {res['r_min']:.10f}   (contact at 2)")

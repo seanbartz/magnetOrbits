@@ -55,7 +55,13 @@ Outcomes and events
              With stop="escape" the run ends here (cheap: for outcome maps);
              with stop="r_out" (default) the run continues to r = r_out so the
              deflection angle is asymptotic.
-  "timeout"  t_max reached without either (long-lived transient complexes).
+  "timeout"  t_max reached with neither contact nor the escape criterion (long-lived
+             transient complexes).
+  "undecided" stop="r_out" run reached r_out before the escape criterion held (only possible
+             for a small user-chosen r_out).
+  Escape is declared ONLY when the rigorous criterion fires; reaching r_out does not count
+  (for a small user-chosen r_out the criterion may not yet hold). The deflection is reported
+  only for runs that actually reached r_out, so it is always the asymptotic value.
 
 Interface
 ---------
@@ -219,10 +225,10 @@ def _make_escape_event(terminal):
     return event
 
 
-def _make_outgoing_radius_event(outgoing_radius):
+def _make_outgoing_radius_event(outgoing_radius, terminal):
     def event(t, y, *args):
         return np.sqrt(y[0] ** 2 + y[1] ** 2 + y[2] ** 2) - outgoing_radius
-    event.terminal = True
+    event.terminal = terminal
     event.direction = 1
     return event
 
@@ -258,18 +264,20 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
     w1, w2 : initial spin angular velocities (3,); nonzero requires asymptotic_correction=False.
     params : SphereParams (inertia factor beta).
     start_radius : r0 of the in-state.
-    outgoing_radius : r_out where an escaping run stops (default = start_radius).
+    outgoing_radius : r_out where a stop="r_out" run ends (default = start_radius).
     stop : "r_out" (asymptotic deflection) or "escape" (stop at the rigorous criterion).
     rtol, atol : solve_ivp tolerances (atol applies to every component).
-    max_time : timeout; default 4 r0 / v_inf + 2000.
+    max_time : timeout; default 2 (r0 + r_out) / v_inf + 2000 (twice the straight-line
+        travel time in and out, plus margin for the interaction region).
     keep_solution : also return the solve_ivp result (dense output on).
 
     Returns dict with
-        outcome            "contact" | "escape" | "timeout"
+        outcome            "contact" | "escape" | "timeout" | "undecided"
         contact_via        "event" (r - 2 sign change) | "periapsis" (grazing dip) | None
         t_end, y_end       end time and state (for contact: state at first touch)
         r_min              smallest periapsis distance found (or r at contact)
-        deflection         signed planar deflection with windings (nan if non-planar/not escaped)
+        deflection         signed planar deflection with windings (nan if non-planar, or
+                           the run did not escape AND reach r_out)
         deflection_3d      unsigned angle between initial and final velocity
         energy_drift, angular_momentum_drift, moment_norm_error : validation numbers
         n_rhs, escape_time, params/settings echo
@@ -278,15 +286,15 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
     y0 = initial_state(energy, impact_parameter, m1, m2, w1, w2, start_radius,
                        inertia_tilde=inertia, asymptotic_correction=asymptotic_correction)
     speed = np.sqrt(2.0 * energy)
-    if max_time is None:
-        max_time = 4.0 * start_radius / speed + 2000.0
     if outgoing_radius is None:
         outgoing_radius = start_radius
+    if max_time is None:
+        max_time = 2.0 * (start_radius + outgoing_radius) / speed + 2000.0
 
     if stop not in ("r_out", "escape"):
         raise ValueError(f"unknown stop mode {stop!r}")
     events = [_contact_event, _periapsis_event, _make_escape_event(stop == "escape"),
-              _make_outgoing_radius_event(outgoing_radius)]
+              _make_outgoing_radius_event(outgoing_radius, terminal=(stop == "r_out"))]
     sol = integrate_state(y0, max_time, params=params, rtol=rtol, atol=atol,
                           events=events, dense_output=keep_solution)
 
@@ -308,9 +316,12 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
         else:
             y_end, contact_via = y_peri[grazing[0]], "periapsis"
         r_min = min(np.linalg.norm(y_end[0:3]), np.nanmin([r_min, np.inf]))
-    elif len(sol.t_events[2]) or len(sol.t_events[3]):
+    elif len(sol.t_events[2]):
         outcome = "escape"
-        escape_time = sol.t_events[2][0] if len(sol.t_events[2]) else np.nan
+        escape_time = sol.t_events[2][0]
+    reached_outgoing_radius = outcome != "contact" and len(sol.t_events[3]) > 0
+    if outcome == "timeout" and reached_outgoing_radius and stop == "r_out":
+        outcome = "undecided"
 
     # 2. Validation numbers along the accepted steps (up to t_end).
     keep = sol.t <= t_end
@@ -320,7 +331,7 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
 
     # 3. Scattering observables.
     deflection, deflection_3d = np.nan, np.nan
-    if outcome == "escape":
+    if outcome == "escape" and reached_outgoing_radius:
         deflection, deflection_3d = observables.deflection_angles(y0, y_end)
 
     result = {

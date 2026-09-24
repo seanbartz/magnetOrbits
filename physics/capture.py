@@ -33,9 +33,9 @@ from physics.solve import run_trajectory
 
 
 def outcome_at(energy, impact_parameter, m1, m2, **trajectory_kwargs):
-    """Outcome string of one run with stop="escape" (a timeout raises: undecided)."""
+    """Outcome string of one run with stop="escape" (a timeout raises: edge undecided)."""
     res = run_trajectory(energy, impact_parameter, m1, m2, stop="escape", **trajectory_kwargs)
-    if res["outcome"] == "timeout":
+    if res["outcome"] not in ("contact", "escape"):
         raise RuntimeError(f"timeout at E={energy}, b={impact_parameter}: edge undecided")
     return res["outcome"]
 
