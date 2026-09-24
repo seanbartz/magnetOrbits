@@ -152,7 +152,8 @@ def sweep_point(energy, i, j, n_phi, settings):
     t0 = time.time()
     prof = in_plane_profile(energy, phi1, phi2, b_min=settings["b_min"], b_max=settings["b_max"],
                             n_scan=settings["n_scan"], rel_tol=settings["rel_tol"],
-                            start_radius=settings.get("start_radius", 1000.0))
+                            start_radius=settings.get("start_radius", 1000.0),
+                            method=settings.get("method", "reference"))
     return {
         "i": i, "j": j, "n_phi": n_phi, "phi1": phi1, "phi2": phi2,
         "outer_edge": None if np.isnan(prof["outer_edge"]) else float(prof["outer_edge"]),

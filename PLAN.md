@@ -64,6 +64,15 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   *Checks:* $+z/-z$ gives one interval $[0,b_c]$; $(0,0)$ gives 5.7546; symmetries
   $(\phi_1,\phi_2)\sim(\phi_1+\pi,\phi_2+\pi)\sim(\phi_2,\phi_1)$ hold on a full-torus coarse map;
   sweep point = direct call; interval counts stable under scan refinement.
+- [x] **7. Compiled integrator** (`physics/fast.py`, approved 2026-09-24): Numba DOP853 with the
+  same tableau, error norm, step control and 7th-order dense output as scipy; events located in
+  the loop; in-state correction by fixed-order Gauss–Legendre. scipy path stays as
+  `method="reference"`.
+  *Checks:* compiled RHS = `equations_of_motion` to roundoff; quadrature = `quad_vec` to
+  $10^{-12}$; step sequence and end state match scipy DOP853 (same algorithm) to $\sim10^{-12}$;
+  `run_trajectory(method="numba")` reproduces every reference-path test case; recomputed
+  $32\times32$ map matches `tests/reference/map_torus32.npz` (identical interval counts, edges
+  to $2\times10^{-6}$); measured speedup reported.
 - [ ] **6a. $\tilde b_c(\tilde E)$** for head-to-tail vs. locked and $+z/-z$ curves (deferred).
 
 ## Findings so far
@@ -106,6 +115,13 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   alternation along it: unresolved). 992/1024 orientations have one contact interval; 32 (the
   diagonals $\phi_1+\phi_2=15\pi/16$ and its flip image) have an escape window at
   $b\approx2.78$–$3.03$ inside the contact region. No timeouts, no contact at $b_{\max}=10$.
+
+- **Compiled integrator** (stage 7): `method="numba"` takes the same DOP853 steps as scipy
+  (identical RHS-evaluation counts on 24 generic runs), end states agree to $\lesssim10^{-12}$,
+  in-state quadrature agrees with `quad_vec` to $1.3\times10^{-15}$, and every reference-path
+  known result is reproduced. The full $32\times32$ map recomputed with it is identical to the
+  scipy map (edges bit-for-bit). Speed: 0.29 ms vs 111 ms per trajectory (383x); the map takes
+  6.7 s instead of 34 min on 18 workers.
 
 ## Cost outlook
 

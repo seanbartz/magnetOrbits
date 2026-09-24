@@ -42,6 +42,9 @@ sweep.py  (orientation maps over (phi1, phi2), 18 workers, resumable)     (stage
                              symmetry reduction; load_map                    (stage 6b)
        └─ physics/solve.run_trajectory   (same code path as run_single.py)
 analysis/map_checks.py   full-torus symmetry check + map figures           (stage 6b)
+physics/fast.py   compiled DOP853 + events + in-state quadrature;
+                  run_trajectory(..., method="numba"), ~380x faster        (stage 7)
+analysis/compare_maps.py   map vs stored reference (numba vs scipy)        (stage 7)
 physics/capture.py   bisection for the contact/escape edge b_c           (stage 3)
 physics/central.py   independent -kappa/r^3 oracle: b_c, quadrature Theta  (stages 2-3)
 ```
@@ -61,7 +64,7 @@ Orientation maps (in-plane asymptotic moment angles $\phi_1,\phi_2$ from the inc
 direction; defaults to the paper energy $\tilde E=0.033501$):
 
 ```bash
-python sweep.py --name torus32 --n-phi 32                  # full torus (~27 min, 18 workers)
+python sweep.py --name torus32 --n-phi 32 --method numba   # full torus (~7 s; scipy: ~34 min)
 python sweep.py --name fund64 --n-phi 64 --fundamental     # symmetry-reduced domain
 python analysis/map_checks.py results/torus32              # checks + figures/
 ```

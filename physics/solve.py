@@ -90,7 +90,8 @@ def rotate_vector(vec, rotation_vector):
             + axis * (axis @ vec) * (1.0 - np.cos(angle)))
 
 
-def incoming_leg_correction(energy, impact_parameter, x_start, m1, m2, inertia_tilde):
+def incoming_leg_correction(energy, impact_parameter, x_start, m1, m2, inertia_tilde,
+                            quadrature="adaptive"):
     """First-order effect of the torques on the incoming leg (-inf, x_start].
 
     Along the unperturbed straight line r(x) = (x, b, 0), x = x_start - s, speed v = sqrt(2E),
@@ -101,8 +102,17 @@ def incoming_leg_correction(energy, impact_parameter, x_start, m1, m2, inertia_t
 
     Returns (theta1, theta2, w1, w2). Generic torques fall off as 1/r^3, so theta = O(1/(I E r0))
     and w = O(1/(I v r0^2)); neglected terms are O(r0^-2) in theta.
+    quadrature: "adaptive" (scipy quad_vec, the reference) or "gauss" (compiled fixed-order
+    Gauss-Legendre in physics/fast.py; agreement checked in tests/test_fast.py).
     """
     speed = np.sqrt(2.0 * energy)
+    if quadrature == "gauss":
+        from physics import fast
+        moments = fast.incoming_leg_moments(float(x_start), float(impact_parameter),
+                                            np.ascontiguousarray(m1, dtype=float),
+                                            np.ascontiguousarray(m2, dtype=float))
+        return (moments[6:9] / (inertia_tilde * speed**2), moments[9:12] / (inertia_tilde * speed**2),
+                moments[0:3] / (inertia_tilde * speed), moments[3:6] / (inertia_tilde * speed))
 
     def integrand(s):
         position = np.array([x_start - s, impact_parameter, 0.0])
@@ -118,7 +128,8 @@ def incoming_leg_correction(energy, impact_parameter, x_start, m1, m2, inertia_t
 
 
 def initial_state(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0), start_radius=1000.0,
-                  inertia_tilde=SphereParams().inertia_tilde, asymptotic_correction=True):
+                  inertia_tilde=SphereParams().inertia_tilde, asymptotic_correction=True,
+                  quadrature="adaptive"):
     """19-component in-state (see module docstring). Moments are normalized here.
 
     The speed v0 at r0 is chosen so that v0^2/2 + U(r0) + K_rot(r0) = E exactly (the
@@ -147,7 +158,7 @@ def initial_state(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0), 
                              "pass asymptotic_correction=False (moments then refer to r0)")
         x_start = -np.sqrt(start_radius**2 - impact_parameter**2)
         theta1, theta2, w1, w2 = incoming_leg_correction(
-            energy, impact_parameter, x_start, m1, m2, inertia_tilde)
+            energy, impact_parameter, x_start, m1, m2, inertia_tilde, quadrature=quadrature)
         m1, m2 = rotate_vector(m1, theta1), rotate_vector(m2, theta2)
         # Spin energy picked up on the way in came out of the orbital energy.
         acquired_rotational_energy = 0.5 * inertia_tilde * (w1 @ w1 + w2 @ w2)
@@ -253,7 +264,7 @@ def integrate_state(y0, max_time, params=SphereParams(), rtol=1e-10, atol=1e-12,
 def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
                    params=SphereParams(), start_radius=1000.0, outgoing_radius=None,
                    stop="r_out", rtol=1e-10, atol=1e-12, max_time=None,
-                   asymptotic_correction=True, keep_solution=False):
+                   asymptotic_correction=True, keep_solution=False, method="reference"):
     """Integrate one trajectory and summarize it.
 
     Parameters
@@ -269,7 +280,9 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
     rtol, atol : solve_ivp tolerances (atol applies to every component).
     max_time : timeout; default 2 (r0 + r_out) / v_inf + 2000 (twice the straight-line
         travel time in and out, plus margin for the interaction region).
-    keep_solution : also return the solve_ivp result (dense output on).
+    keep_solution : also return the solve_ivp result (dense output on; reference method only).
+    method : "reference" (scipy solve_ivp + quad_vec: the validated oracle) or "numba"
+        (physics/fast.py: the same DOP853 algorithm and event semantics, compiled; ~50x faster).
 
     Returns dict with
         outcome            "contact" | "escape" | "timeout" | "undecided"
@@ -283,8 +296,13 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
         n_rhs, escape_time, params/settings echo
     """
     inertia = params.inertia_tilde
+    if method not in ("reference", "numba"):
+        raise ValueError(f"unknown method {method!r}")
+    if method == "numba" and keep_solution:
+        raise ValueError("keep_solution needs dense output: use method='reference'")
     y0 = initial_state(energy, impact_parameter, m1, m2, w1, w2, start_radius,
-                       inertia_tilde=inertia, asymptotic_correction=asymptotic_correction)
+                       inertia_tilde=inertia, asymptotic_correction=asymptotic_correction,
+                       quadrature="gauss" if method == "numba" else "adaptive")
     speed = np.sqrt(2.0 * energy)
     if outgoing_radius is None:
         outgoing_radius = start_radius
@@ -293,16 +311,28 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
 
     if stop not in ("r_out", "escape"):
         raise ValueError(f"unknown stop mode {stop!r}")
-    events = [_contact_event, _periapsis_event, _make_escape_event(stop == "escape"),
-              _make_outgoing_radius_event(outgoing_radius, terminal=(stop == "r_out"))]
-    sol = integrate_state(y0, max_time, params=params, rtol=rtol, atol=atol,
-                          events=events, dense_output=keep_solution)
+    if method == "reference":
+        events = [_contact_event, _periapsis_event, _make_escape_event(stop == "escape"),
+                  _make_outgoing_radius_event(outgoing_radius, terminal=(stop == "r_out"))]
+        sol = integrate_state(y0, max_time, params=params, rtol=rtol, atol=atol,
+                              events=events, dense_output=keep_solution)
+        t_events, y_events = sol.t_events, sol.y_events
+        y_end, t_end, n_rhs = sol.y[:, -1], sol.t[-1], sol.nfev
+    else:
+        from physics import fast
+        (status, n_rhs, t_end, y_end, counts, ev_t, ev_y, step_times,
+         step_diag) = fast.integrate_scattering(y0, float(max_time), inertia, rtol, atol,
+                                                float(outgoing_radius), stop == "escape", stop == "r_out")
+        if status == -1:
+            raise RuntimeError("compiled DOP853 failed: step size too small")
+        t_events = [ev_t[e, :counts[e]] for e in range(4)]
+        y_events = [ev_y[e, :counts[e]] for e in range(4)]
+        y_end = y_end.copy()
 
     # 1. Classify the outcome.
-    y_end, t_end = sol.y[:, -1], sol.t[-1]
     outcome, r_min, escape_time, contact_via = "timeout", np.nan, np.nan, None
-    t_contact, y_contact = sol.t_events[0], sol.y_events[0]
-    t_peri, y_peri = sol.t_events[1], sol.y_events[1]
+    t_contact, y_contact = t_events[0], y_events[0]
+    t_peri, y_peri = t_events[1], y_events[1]
     r_peri = np.linalg.norm(y_peri[:, 0:3], axis=1) if len(t_peri) else np.array([])
     grazing = np.nonzero(r_peri < CONTACT_SEPARATION)[0]
     r_min = r_peri.min() if r_peri.size else np.nan
@@ -316,18 +346,26 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
         else:
             y_end, contact_via = y_peri[grazing[0]], "periapsis"
         r_min = min(np.linalg.norm(y_end[0:3]), np.nanmin([r_min, np.inf]))
-    elif len(sol.t_events[2]):
+    elif len(t_events[2]):
         outcome = "escape"
-        escape_time = sol.t_events[2][0]
-    reached_outgoing_radius = outcome != "contact" and len(sol.t_events[3]) > 0
+        escape_time = t_events[2][0]
+    reached_outgoing_radius = outcome != "contact" and len(t_events[3]) > 0
     if outcome == "timeout" and reached_outgoing_radius and stop == "r_out":
         outcome = "undecided"
 
-    # 2. Validation numbers along the accepted steps (up to t_end).
-    keep = sol.t <= t_end
-    ys = np.column_stack([sol.y[:, keep], y_end])
-    energy_series = observables.total_energy(ys, inertia)
-    j_series = observables.total_angular_momentum(ys, inertia)
+    # 2. Validation numbers along the accepted steps (up to t_end), plus the end state.
+    if method == "reference":
+        keep = sol.t <= t_end
+        ys = np.column_stack([sol.y[:, keep], y_end])
+        energy_series = observables.total_energy(ys, inertia)
+        j_series = observables.total_angular_momentum(ys, inertia)
+        moment_error = observables.moment_norm_error(ys)
+    else:
+        end_diag = np.empty(5)
+        fast.diagnostics(y_end, inertia, end_diag)
+        diag = np.vstack([step_diag[step_times <= t_end], end_diag])
+        energy_series, j_series = diag[:, 0], diag[:, 1:4].T
+        moment_error = float(diag[:, 4].max())
 
     # 3. Scattering observables.
     deflection, deflection_3d = np.nan, np.nan
@@ -340,8 +378,8 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
         "energy_initial": energy_series[0],
         "energy_drift": observables.relative_drift(energy_series),
         "angular_momentum_drift": observables.relative_drift(j_series),
-        "moment_norm_error": observables.moment_norm_error(ys),
-        "n_rhs": sol.nfev,
+        "moment_norm_error": moment_error,
+        "n_rhs": n_rhs, "method": method,
         "settings": dict(energy=energy, impact_parameter=impact_parameter, start_radius=start_radius,
                          outgoing_radius=outgoing_radius, stop=stop, rtol=rtol, atol=atol,
                          max_time=max_time, inertia_factor=params.inertia_factor,
