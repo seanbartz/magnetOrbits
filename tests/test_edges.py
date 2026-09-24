@@ -24,6 +24,7 @@ from physics import central
 from physics.edges import (capture_profile, fundamental_domain, in_plane_profile, load_map,
                            sweep_point, symmetry_orbit)
 from tests.published.bartz_shaw_2022 import ENERGY_TILDE
+from tests.validated import STAGE5_HEAD_TO_TAIL_EDGE
 
 Z = np.array([0.0, 0.0, 1.0])
 SETTINGS = dict(b_min=0.05, b_max=10.0, n_scan=200, rel_tol=1e-6)
@@ -44,7 +45,7 @@ def test_antiparallel_z_single_interval():
 def test_head_to_tail_matches_stage5():
     prof = in_plane_profile(ENERGY_TILDE, 0.0, 0.0, **SETTINGS)
     assert prof["n_intervals"] == 1
-    assert prof["outer_edge"] == pytest.approx(5.7545902, abs=1e-5)
+    assert prof["outer_edge"] == pytest.approx(STAGE5_HEAD_TO_TAIL_EDGE, abs=1e-5)
 
 
 @pytest.mark.slow

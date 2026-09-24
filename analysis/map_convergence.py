@@ -17,9 +17,10 @@ The sample is every multi-interval point in the fundamental domain plus random o
 
 The tightened recompute uses the run's own integrator (the compiled one for numba runs; scipy's is
 ~400x slower). Tightening cannot expose a defect shared by both computations, so for a numba run the
-first --n-reference sample points (multi-interval first; default 2) are also recomputed with the
-independent scipy reference integrator at the run's own settings and must match to the same
-threshold. --reference recomputes the whole tightened sample with scipy instead.
+first --n-reference sample points (multi-interval first; default 1, since each costs about as
+much as a few hundred compiled profiles) are also recomputed with the independent scipy reference
+integrator at the run's own settings and must match to the same threshold. The two comparisons
+are reported separately. --reference recomputes the whole tightened sample with scipy instead.
 """
 
 import os
@@ -80,7 +81,7 @@ def main():
     p.add_argument("--reference", action="store_true",
                    help="recompute with the scipy reference integrator instead of the run's own method "
                         "(an independent check; ~400x slower)")
-    p.add_argument("--n-reference", type=int, default=2,
+    p.add_argument("--n-reference", type=int, default=1,
                    help="for a numba run: sample points also recomputed with scipy at the run's settings")
     args = p.parse_args()
 
@@ -111,13 +112,17 @@ def main():
         tight = list(pool.map(recompute, [a + (method,) for a in angles]))
         independent = [f.result() for f in ref_futures]
 
-    worst, failures = 0.0, []
+    ref_worst, ref_failures = 0.0, []
     for (i, j), prof in zip(cross, independent):
-        same, diff = compare_profile(prof, data["records"][(i, j)])
+        rec = data["records"][(i, j)]
+        same, diff = compare_profile(prof, rec)
         if not same or diff > EDGE_THRESHOLD:
-            failures.append((i, j))
+            ref_failures.append((i, j))
+        if same and rec["edges"]:
+            ref_worst = max(ref_worst, diff)
         print(f"  ({i:2d},{j:2d}) scipy reference vs {settings['method']}: structure "
               f"{'identical' if same else 'DIFFERENT'}, max rel edge diff {diff:.1e}")
+    worst, failures = 0.0, []
     for (i, j), prof in zip(sample, tight):
         rec = data["records"][(i, j)]
         same, diff = compare_profile(prof, rec)
@@ -127,11 +132,14 @@ def main():
             worst = max(worst, diff)
         print(f"  ({i:2d},{j:2d}) intervals {rec['n_intervals']} -> {prof['n_intervals']}  "
               f"max rel edge diff {diff:.1e}")
+    if cross:
+        status = "PASS" if not ref_failures else f"FAIL at {ref_failures}"
+        print(f"scipy reference: structure identical at {len(cross) - len(ref_failures)}/{len(cross)}; "
+              f"max rel edge diff {ref_worst:.1e} (threshold {EDGE_THRESHOLD:.0e})  -> {status}")
     status = "PASS" if not failures else f"FAIL at {failures}"
-    print(f"{len(failures)} failures over {len(sample)} tightened + {len(cross)} reference recomputes; "
-          f"max rel edge diff (tightened) {worst:.1e} "
-          f"(threshold {EDGE_THRESHOLD:.0e})  -> {status}")
-    if failures:
+    print(f"tightened: structure identical at {len(sample) - len(failures)}/{len(sample)}; max rel edge diff "
+          f"{worst:.1e} (threshold {EDGE_THRESHOLD:.0e})  -> {status}")
+    if failures or ref_failures:
         raise SystemExit(1)
 
 

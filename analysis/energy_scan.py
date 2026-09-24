@@ -8,7 +8,8 @@ Usage
     python analysis/energy_scan.py save-reference   # summary -> tests/reference/energy_scan.json
 
 Per energy E (ENERGIES, 1e-3 .. 10, log-spaced, incl. the paper energy and the crossovers):
-  * results/escan_<k>/ : sweep.py --fundamental --n-phi 32 with the scan_settings(E) rules;
+  * results/escan_E<E>/ : sweep.py --fundamental --n-phi 32 with the scan_settings(E) rules (named by
+    energy, so adding or removing energies leaves the other runs valid);
   * head-to-tail edge  = the map point (phi1, phi2) = (0, 0);
   * orientation averages over the 32 x 32 torus from the fundamental domain, each representative
     weighted by the size of its symmetry orbit (exact for the torus grid). The 16 x 16 subgrid
@@ -26,17 +27,18 @@ Scaling rules (scan_settings):
                                      value (r0 = 64000 at the paper energy); 1000 is the stage-2
                                      validated floor at high energy.
 
-Before analysis, every run must be complete, have exactly the settings sweep_settings(E) gives
-(so a stale or renumbered results directory cannot be read as another energy), and have a finite
+Before analysis, every run must be complete, have the settings sweep_settings(E) gives (floats to
+rel 1e-12, so a run swept on another platform is not rejected over a last-bit difference; a run
+made under older scan rules is rejected, and `run` refuses to resume it), and have a finite
 outer edge with no contact at the top of the scan (otherwise b_max was too small and b_out would be
 underestimated).
 
 Checks (analyze): +z/-z edge vs analytic on both branches; head-to-tail b_out/b_locked -> 1
 monotonically as E -> 0; b_out -> 2 monotonically as E -> infinity with (b_out^2 - 4) E settling to
 a constant; at the paper energy the head-to-tail edge equals the stage-5 value
-(tests/test_paper_comparison.OUR_EDGE) and the map agrees with tests/reference/map_torus32.npz;
-provenance: every run clean and unmixed, and the runtime code (sweep.RUNTIME_PATHS) identical at
-every run's commit and at the analysis commit.
+(tests/validated.py) and the map agrees with tests/reference/map_torus32.npz;
+provenance: every run clean and unmixed, the analysis tree clean, and the runtime code
+(sweep.RUNTIME_PATHS) identical at every run's commit and at the analysis commit.
 Output: results/energy_scan/summary.json, figures/energy_scan_*.pdf.
 """
 
@@ -56,6 +58,7 @@ sys.path.insert(0, str(ROOT))
 from physics import central                                                       # noqa: E402
 from physics.edges import capture_profile, completeness_problem, load_map, symmetry_orbit   # noqa: E402
 from tests.published.bartz_shaw_2022 import ENERGY_TILDE as E_PAPER               # noqa: E402
+from tests.validated import STAGE5_HEAD_TO_TAIL_EDGE                              # noqa: E402
 
 from compare_maps import max_rel_diff                                             # noqa: E402
 
@@ -82,19 +85,41 @@ def sweep_settings(energy):
             "rel_tol": REL_TOL, "start_radius": cfg["start_radius"], "method": "numba"}
 
 
-def run_name(k):
-    return f"escan_{k:02d}"
+def settings_problem(meta, energy):
+    """Why a run's meta.json does not match this scan's settings for this energy, or None.
+
+    Floats are compared to rel 1e-12 (b_max and r0 come from fractional powers, which may differ in
+    the last bit between platforms); everything else must be equal.
+    """
+    want, have = sweep_settings(energy), meta["settings"]
+    same = set(want) == set(have) and all(
+        np.isclose(have[k], v, rtol=1e-12, atol=0.0) if isinstance(v, float) else have[k] == v
+        for k, v in want.items())
+    if same and meta["n_phi"] == N_PHI and meta.get("fundamental"):
+        return None
+    return (f"settings {have} (n_phi {meta['n_phi']}, fundamental {meta.get('fundamental')}) differ from "
+            f"this scan's {want}")
+
+
+def run_name(energy):
+    return f"escan_E{energy:.6g}"
 
 
 def run(workers=18):
-    for k, energy in enumerate(ENERGIES):
+    for energy in ENERGIES:
         s = sweep_settings(energy)
-        cmd = [sys.executable, "sweep.py", "--name", run_name(k), "--fundamental", "--n-phi", str(N_PHI),
+        meta_file = ROOT / "results" / run_name(energy) / "meta.json"
+        if meta_file.exists():
+            problem = settings_problem(json.loads(meta_file.read_text()), energy)
+            if problem:
+                raise SystemExit(f"results/{run_name(energy)} was made under other scan rules: {problem}. "
+                                 f"Move or delete that directory, then run again.")
+        cmd = [sys.executable, "sweep.py", "--name", run_name(energy), "--fundamental", "--n-phi", str(N_PHI),
                "--energy", repr(energy), "--b-min", repr(s["b_min"]), "--b-max", repr(s["b_max"]),
                "--n-scan", str(s["n_scan"]), "--rel-tol", repr(s["rel_tol"]),
                "--start-radius", repr(s["start_radius"]), "--method", s["method"], "--workers", str(workers)]
         print(f"E = {energy:<9.4g} b_max {s['b_max']:6.2f}  n_scan {s['n_scan']:4d}  r0 {s['start_radius']:9.0f}  "
-              f"-> results/{run_name(k)}", flush=True)
+              f"-> results/{run_name(energy)}", flush=True)
         t0 = time.time()
         # Output is not captured: sweep.py's progress, and its reason for refusing or failing, stay visible.
         subprocess.run(cmd, cwd=ROOT, check=True)
@@ -106,10 +131,9 @@ def run_problem(data, energy):
     problem = completeness_problem(data)
     if problem:
         return f"incomplete: {problem}"
-    meta = data["meta"]
-    if meta["settings"] != sweep_settings(energy) or meta["n_phi"] != N_PHI or not meta.get("fundamental"):
-        return (f"settings {meta['settings']} (n_phi {meta['n_phi']}, fundamental {meta.get('fundamental')}) "
-                f"differ from this scan's {sweep_settings(energy)}; rerun `energy_scan.py run` into fresh directories")
+    problem = settings_problem(data["meta"], energy)
+    if problem:
+        return f"{problem}; move or delete the directory and rerun `energy_scan.py run`"
     no_edge = sorted(k for k, rec in data["records"].items() if rec["outer_edge"] is None)
     at_top = sorted(k for k, rec in data["records"].items() if rec["contact_at_scan_top"])
     if no_edge or at_top:
@@ -150,18 +174,18 @@ def _zz_job(energy):
 def analyze(workers=min(18, os.cpu_count() or 1)):
     # 1. Validate every run before computing anything from it.
     maps = {}
-    for k, energy in enumerate(ENERGIES):
-        data = load_map(ROOT / "results" / run_name(k), expand_symmetry=False)
+    for energy in ENERGIES:
+        data = load_map(ROOT / "results" / run_name(energy), expand_symmetry=False)
         problem = run_problem(data, energy)
         if problem:
-            raise SystemExit(f"{run_name(k)} (E = {energy}): {problem}")
+            raise SystemExit(f"{run_name(energy)}: {problem}")
         maps[energy] = data
     # 2. The +z/-z analytic check, all energies in parallel.
     with ProcessPoolExecutor(max_workers=workers) as pool:
         zz_edges = dict(zip(ENERGIES, pool.map(_zz_job, ENERGIES)))
 
     rows = []
-    for k, energy in enumerate(ENERGIES):
+    for energy in ENERGIES:
         cfg = scan_settings(energy)
         data = maps[energy]
         meta = data["meta"]
@@ -170,7 +194,7 @@ def analyze(workers=min(18, os.cpu_count() or 1)):
         b_locked = central.capture_impact_parameter(energy, 2.0)
         zz = zz_edges[energy]
         zz_exact = central.capture_impact_parameter(energy, 1.0)
-        rows.append({"energy": energy, **cfg, "run": run_name(k), "git_hash": meta["git_hash"],
+        rows.append({"energy": energy, **cfg, "run": run_name(energy), "git_hash": meta["git_hash"],
                      "git_dirty": meta["git_dirty"] or meta.get("git_mixed", False),
                      "b_head_to_tail": b_ht, "b_locked": b_locked, "ratio_locked": b_ht / b_locked,
                      "b_zz": zz, "b_zz_exact": zz_exact, "zz_rel_err": abs(zz / zz_exact - 1), **stats,
@@ -181,7 +205,7 @@ def analyze(workers=min(18, os.cpu_count() or 1)):
               f"windows {100 * r['window_fraction']:4.1f}%  zz rel err {r['zz_rel_err']:.1e}", flush=True)
 
     head, dirty = git_state()
-    checks = run_checks(rows, maps[E_PAPER], head)
+    checks = run_checks(rows, maps[E_PAPER], head, dirty)
     for name, ok, detail in checks:
         print(f"CHECK {name:28s} {'PASS' if ok else 'FAIL'}  {detail}")
     out = {"energies": ENERGIES, "rows": rows, "checks": [{"name": n, "pass": bool(o), "detail": d} for n, o, d in checks],
@@ -198,9 +222,8 @@ def is_strictly_monotone(values):
     return bool(np.all(diffs > 0) or np.all(diffs < 0))
 
 
-def run_checks(rows, paper_map, analysis_head):
+def run_checks(rows, paper_map, analysis_head, analysis_dirty):
     """Known-result checks on the scan (name, pass, detail)."""
-    from tests.test_paper_comparison import OUR_EDGE
     checks = []
     zz = max(r["zz_rel_err"] for r in rows)
     checks.append(("+z/-z edge vs analytic", zz < 2e-6, f"max rel err {zz:.1e} over {len(rows)} energies (both branches)"))
@@ -221,11 +244,11 @@ def run_checks(rows, paper_map, analysis_head):
                    "b_out - 2 = " + ", ".join(f"{g:.4f}@{r['energy']:g}" for g, r in zip(gaps, high))
                    + "; (b^2-4)E = " + ", ".join(f"{x:.3f}" for x in excess)))
     paper = next(r for r in rows if r["energy"] == E_PAPER)
-    checks.append(("paper energy head-to-tail", abs(paper["b_head_to_tail"] / OUR_EDGE - 1) < 2e-6,
-                   f"{paper['b_head_to_tail']:.7f} vs stage-5 {OUR_EDGE}"))
+    checks.append(("paper energy head-to-tail", abs(paper["b_head_to_tail"] / STAGE5_HEAD_TO_TAIL_EDGE - 1) < 2e-6,
+                   f"{paper['b_head_to_tail']:.7f} vs stage-5 {STAGE5_HEAD_TO_TAIL_EDGE}"))
     ok, detail = compare_with_torus_map(paper_map)
     checks.append(("paper energy vs map_torus32", ok, detail))
-    checks.append(("provenance", *provenance(rows, analysis_head)))
+    checks.append(("provenance", *provenance(rows, analysis_head, analysis_dirty)))
     return checks
 
 
@@ -243,21 +266,24 @@ def compare_with_torus_map(data):
     return same_count and worst < 2e-6, f"interval counts identical: {same_count}; max rel b_out diff {worst:.1e}"
 
 
-def provenance(rows, analysis_head):
-    """Every run clean and unmixed, and the runtime code the same at every run's commit and at HEAD.
+def provenance(rows, analysis_head, analysis_dirty):
+    """Every run clean and unmixed, the analysis tree clean, and the runtime code the same at every
+    run's commit and at the analysis commit.
 
     Runs may come from different commits (e.g. only analysis or test files changed in between),
-    but not from different versions of the code that computes the trajectories.
+    but not from different versions of the code that computes the trajectories. The analysis itself
+    recomputes edges (the +z/-z check) from the working tree, so that must be clean too. A run
+    commit missing from the local history (a shallow clone) counts as differing.
     """
     import sweep
     dirty = [r["energy"] for r in rows if r["git_dirty"]]
     hashes = sorted({r["git_hash"] for r in rows})
     changed = [h[:8] for h in hashes
                if subprocess.run(["git", "diff", "--quiet", h, analysis_head, "--", *sweep.RUNTIME_PATHS],
-                                 cwd=ROOT).returncode != 0]
-    detail = (f"dirty or mixed runs: {dirty}; run commits {[h[:8] for h in hashes]}; "
-              f"runtime code differs from {analysis_head[:8]} at: {changed}")
-    return not dirty and not changed, detail
+                                 cwd=ROOT, stderr=subprocess.DEVNULL).returncode != 0]
+    detail = (f"dirty or mixed runs: {dirty}; analysis tree dirty: {analysis_dirty}; run commits "
+              f"{[h[:8] for h in hashes]}; runtime code differs from {analysis_head[:8]} at: {changed}")
+    return not dirty and not analysis_dirty and not changed, detail
 
 
 def git_state():

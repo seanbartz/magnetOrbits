@@ -9,7 +9,9 @@ Checks
   subgrid uses even indices only);
 * run validation: wrong settings (a stale or renumbered run), a missing edge, contact at b_max and
   missing points are rejected; the torus-map comparison fails on a one-sided missing edge;
-* provenance: the stored scan's runs (two commits, same runtime code) pass, a dirty run fails;
+* settings match to rel 1e-12 (a last-bit float difference is accepted); run names are distinct;
+* provenance: rules on synthetic rows (dirty run, dirty analysis tree, unknown commit fail); the
+  stored scan's runs were made with the current runtime code (skipped without the git history);
 * known result: the +z/-z edge at the scan settings matches the analytic b_c on the
   barrier-limited and contact-limited branches;
 * regression: head-to-tail edges recomputed at stored energies equal tests/reference/energy_scan.json.
@@ -27,7 +29,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "analysis"))
 
 from energy_scan import (B_MIN, ENERGIES, N_PHI, antiparallel_z_edge, compare_with_torus_map,     # noqa: E402
-                         provenance, run_problem, scan_settings, sweep_settings, weighted_stats)
+                         provenance, run_name, run_problem, scan_settings, settings_problem, sweep_settings,
+                         weighted_stats)
 from physics import central                                                                     # noqa: E402
 from physics.edges import fundamental_domain, sweep_point                                        # noqa: E402
 from tests.published.bartz_shaw_2022 import ENERGY_TILDE as E_PAPER                             # noqa: E402
@@ -105,12 +108,50 @@ def test_compare_with_torus_map_fails_on_a_one_sided_missing_edge():
     assert not ok and "inf" in detail
 
 
-def test_provenance_accepts_runtime_identical_commits_and_flags_dirty_runs():
+def git_head():
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+
+
+def test_provenance_rules():
+    """Synthetic rows at HEAD: independent of which commits the stored scan was made at."""
+    head = git_head()
+    rows = [{"energy": e, "git_hash": head, "git_dirty": False} for e in ENERGIES[:3]]
+    assert provenance(rows, head, False)[0]
+    assert not provenance(rows, head, True)[0]                                  # dirty analysis tree
+    assert not provenance([dict(rows[0], git_dirty=True)] + rows[1:], head, False)[0]
+    assert not provenance(rows + [dict(rows[0], git_hash="0" * 40)], head, False)[0]   # unknown commit
+
+
+def test_stored_scan_provenance_is_current():
+    """The stored scan's runs were made with the current runtime code.
+
+    Fails after any change to sweep.RUNTIME_PATHS: that is the signal to rerun the scan and
+    regenerate tests/reference/energy_scan.json. Skipped when the run commits are not in the local
+    history (a shallow clone or a source archive).
+    """
     rows = json.loads(REFERENCE.read_text())["rows"]
-    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    ok, detail = provenance(rows, head)
-    assert ok, detail
-    assert not provenance([dict(rows[0], git_dirty=True)] + rows[1:], head)[0]
+    for h in {r["git_hash"] for r in rows}:
+        if subprocess.run(["git", "cat-file", "-e", f"{h}^{{commit}}"], cwd=ROOT,
+                          stderr=subprocess.DEVNULL).returncode != 0:
+            pytest.skip(f"run commit {h[:8]} not in the local git history")
+    ok, detail = provenance(rows, git_head(), False)
+    assert ok, f"{detail} -- rerun analysis/energy_scan.py and regenerate the reference"
+
+
+def test_settings_tolerate_last_bit_float_differences():
+    energy = ENERGIES[0]
+    meta = synthetic_run(energy)["meta"]
+    meta["settings"]["b_max"] = np.nextafter(meta["settings"]["b_max"], np.inf)
+    assert settings_problem(meta, energy) is None
+    meta["settings"]["b_max"] *= 1 + 1e-9
+    assert settings_problem(meta, energy) is not None
+    meta = synthetic_run(energy)["meta"]
+    meta["settings"]["n_scan"] += 1
+    assert settings_problem(meta, energy) is not None
+
+
+def test_run_names_are_distinct_per_energy():
+    assert len({run_name(e) for e in ENERGIES}) == len(ENERGIES)
 
 
 @pytest.mark.slow
