@@ -164,10 +164,27 @@ def _make_outgoing_radius_event(outgoing_radius):
     return event
 
 
+def integrate_state(y0, max_time, params=SphereParams(), rtol=1e-10, atol=1e-12,
+                    fixed_centers=False, events=None, dense_output=False):
+    """Integrate the equations of motion from an arbitrary 19-component state y0.
+
+    The general-purpose entry point (fixed-center rotor tests, time-reversal checks).
+    Scattering runs go through run_trajectory, which calls this with its events.
+    fixed_centers=True freezes r and v, leaving only the rotor dynamics at fixed separation
+    (an external constraint: J is then NOT conserved, E is). Returns the solve_ivp result.
+    """
+    sol = solve_ivp(equations_of_motion, (0.0, max_time), np.asarray(y0, dtype=float),
+                    method="DOP853", rtol=rtol, atol=atol, events=events,
+                    dense_output=dense_output, args=(params.inertia_tilde, fixed_centers))
+    if sol.status == -1:
+        raise RuntimeError(f"solve_ivp failed: {sol.message}")
+    return sol
+
+
 def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
                    params=SphereParams(), start_radius=1000.0, outgoing_radius=None,
                    stop="r_out", rtol=1e-10, atol=1e-12, max_time=None,
-                   fixed_centers=False, keep_solution=False):
+                   keep_solution=False):
     """Integrate one trajectory and summarize it.
 
     Parameters
@@ -181,7 +198,6 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
     stop : "r_out" (asymptotic deflection) or "escape" (stop at the rigorous criterion).
     rtol, atol : solve_ivp tolerances (atol applies to every component).
     max_time : timeout; default 4 r0 / v_inf + 2000.
-    fixed_centers : freeze r (rotational dynamics only).
     keep_solution : also return the solve_ivp result (dense output on).
 
     Returns dict with
@@ -206,37 +222,30 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
         raise ValueError(f"unknown stop mode {stop!r}")
     events = [_contact_event, _periapsis_event, _make_escape_event(stop == "escape"),
               _make_outgoing_radius_event(outgoing_radius)]
-    if fixed_centers:
-        events = []
-
-    sol = solve_ivp(equations_of_motion, (0.0, max_time), y0, method="DOP853",
-                    rtol=rtol, atol=atol, events=events, dense_output=keep_solution,
-                    args=(inertia, fixed_centers))
-    if sol.status == -1:
-        raise RuntimeError(f"solve_ivp failed: {sol.message}")
+    sol = integrate_state(y0, max_time, params=params, rtol=rtol, atol=atol,
+                          events=events, dense_output=keep_solution)
 
     # 1. Classify the outcome.
     y_end, t_end = sol.y[:, -1], sol.t[-1]
     outcome, r_min, escape_time, contact_via = "timeout", np.nan, np.nan, None
-    if not fixed_centers:
-        t_contact, y_contact = sol.t_events[0], sol.y_events[0]
-        t_peri, y_peri = sol.t_events[1], sol.y_events[1]
-        r_peri = np.linalg.norm(y_peri[:, 0:3], axis=1) if len(t_peri) else np.array([])
-        grazing = np.nonzero(r_peri < CONTACT_SEPARATION)[0]
-        r_min = r_peri.min() if r_peri.size else np.nan
+    t_contact, y_contact = sol.t_events[0], sol.y_events[0]
+    t_peri, y_peri = sol.t_events[1], sol.y_events[1]
+    r_peri = np.linalg.norm(y_peri[:, 0:3], axis=1) if len(t_peri) else np.array([])
+    grazing = np.nonzero(r_peri < CONTACT_SEPARATION)[0]
+    r_min = r_peri.min() if r_peri.size else np.nan
 
-        contact_times = list(t_contact) + [t_peri[k] for k in grazing]
-        if contact_times:
-            outcome = "contact"
-            t_end = min(contact_times)
-            if len(t_contact) and t_contact[0] == t_end:
-                y_end, contact_via = y_contact[0], "event"
-            else:
-                y_end, contact_via = y_peri[grazing[0]], "periapsis"
-            r_min = min(np.linalg.norm(y_end[0:3]), np.nanmin([r_min, np.inf]))
-        elif len(sol.t_events[2]) or len(sol.t_events[3]):
-            outcome = "escape"
-            escape_time = sol.t_events[2][0] if len(sol.t_events[2]) else np.nan
+    contact_times = list(t_contact) + [t_peri[k] for k in grazing]
+    if contact_times:
+        outcome = "contact"
+        t_end = min(contact_times)
+        if len(t_contact) and t_contact[0] == t_end:
+            y_end, contact_via = y_contact[0], "event"
+        else:
+            y_end, contact_via = y_peri[grazing[0]], "periapsis"
+        r_min = min(np.linalg.norm(y_end[0:3]), np.nanmin([r_min, np.inf]))
+    elif len(sol.t_events[2]) or len(sol.t_events[3]):
+        outcome = "escape"
+        escape_time = sol.t_events[2][0] if len(sol.t_events[2]) else np.nan
 
     # 2. Validation numbers along the accepted steps (up to t_end).
     keep = sol.t <= t_end
@@ -259,8 +268,7 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
         "n_rhs": sol.nfev,
         "settings": dict(energy=energy, impact_parameter=impact_parameter, start_radius=start_radius,
                          outgoing_radius=outgoing_radius, stop=stop, rtol=rtol, atol=atol,
-                         max_time=max_time, fixed_centers=fixed_centers,
-                         inertia_factor=params.inertia_factor),
+                         max_time=max_time, inertia_factor=params.inertia_factor),
     }
     if keep_solution:
         result["solution"] = sol
