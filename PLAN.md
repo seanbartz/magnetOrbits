@@ -57,8 +57,14 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   orientation specified at a finite $r_0$ differs from the one at infinity by
   $O(1/\tilde I\tilde E r_0)$. Add a first-order incoming-leg correction to the in-state and
   show the $r_0$-convergence order improves from 1 to 2.
-- [ ] **6. New phase (re-plan)**: $\tilde b_c(\tilde E)$ and outcome maps over orientations,
-  using the symmetries $\hat\mu\to-\hat\mu$ (both) and $1\leftrightarrow2$.
+- [ ] **6b. In-plane orientation maps** at $\tilde E=0.0335$ (approved 2026-09-23).
+  Asymptotic angles $(\phi_1,\phi_2)$ from $\hat x$. Per orientation: scan $b\in(0,10]$, bisect
+  every sign change → outer edge, capture measure, interval count (`physics/edges.py`,
+  `sweep.py`, parallel).
+  *Checks:* $+z/-z$ gives one interval $[0,b_c]$; $(0,0)$ gives 5.7546; symmetries
+  $(\phi_1,\phi_2)\sim(\phi_1+\pi,\phi_2+\pi)\sim(\phi_2,\phi_1)$ hold on a full-torus coarse map;
+  sweep point = direct call; interval counts stable under scan refinement.
+- [ ] **6a. $\tilde b_c(\tilde E)$** for head-to-tail vs. locked and $+z/-z$ curves (deferred).
 
 ## Findings so far
 
@@ -80,6 +86,11 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   finite start ($\ge5.66$ even at $8R$), and sticking vs. touching (first-bounce sticking
   estimate with $\Gamma=0.05$: $5.54$). $\tilde E$ larger by $2.07\times$ would give $4.65$
   — suggestive of a factor-2 convention difference; needs the original GlowScript code.
+  Checked `Dropbox/ISU/Research/Spherical magnets` (2026-09-23): `magnet_sim.ipynb` is a
+  separate 2D sketch (not the paper's code); the draft `equations.tex` defines
+  $x_c=(\mu_0\mu^2/4\pi k)^{1/5}=0.59$ mm, without the paper's factor 3 (0.72 mm). If the
+  simulation used $\tilde R=R/0.59\,{\rm mm}=8.47$, then $\tilde E=0.0610$ and our touching edge is
+  $4.83$ (first-bounce sticking estimate $3.51$), bracketing $4.65$. Unresolved without the code.
 
 ## Cost outlook
 
