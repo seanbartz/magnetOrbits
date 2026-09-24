@@ -46,15 +46,20 @@ Interfaces
 ----------
 integrate_scattering(y0, t_bound, inertia, rtol, atol, outgoing_radius, escape_terminal,
                      rout_terminal) -> tuple (see its docstring)
-incoming_leg_moments(energy, b, x_start, m1, m2) -> (12,) torque moments as in
-                     solve.incoming_leg_correction
+incoming_leg_moments(x_start, b, m1, m2) -> (12,) torque moments (Int tau1, Int tau2,
+                     Int s tau1, Int s tau2); solve.incoming_leg_correction divides them by
+                     I v and I v^2
 Compilation happens on first call (cache=True writes it to __pycache__).
 """
 
 import math
 
 import numpy as np
-from numba import njit
+try:
+    from numba import njit
+except ImportError as exc:     # numba is a declared dependency; say so clearly if it is missing
+    raise ImportError("method='numba' needs the numba package (pip install numba); "
+                      "method='reference' (scipy) works without it") from exc
 from scipy.integrate._ivp import dop853_coefficients as dop
 
 # --- DOP853 constants (scipy's own arrays) -------------------------------------------------
@@ -391,7 +396,11 @@ def integrate_scattering(y0, t_bound, inertia, rtol, atol, outgoing_radius,
             n_rhs += N_STAGES
             for k in range(n):
                 K[N_STAGES, k] = f_new[k]
-            # error norm (DOP853._estimate_error_norm)
+            # error norm: DOP853._estimate_error_norm, which aggregates GLOBALLY,
+            #   |h| ||err5||^2 / sqrt((||err5||^2 + 0.01 ||err3||^2) n),
+            # (the per-component hypot correction is DOP853._estimate_error, "left for testing
+            # purposes" and not used by step control in scipy 1.9). Identical RHS-evaluation
+            # counts vs scipy in tests/test_fast.py confirm the same accept/reject sequence.
             e5 = 0.0
             e3 = 0.0
             for k in range(n):

@@ -145,3 +145,30 @@ def test_speedup():
     t_fast = (time.perf_counter() - t0) / 30
     print(f"reference {t_ref * 1e3:.1f} ms, numba {t_fast * 1e3:.2f} ms, speedup {t_ref / t_fast:.0f}x")
     assert t_ref / t_fast > 50
+
+
+def test_compare_maps_nan_and_exit_status(tmp_path):
+    """analysis/compare_maps.py: a nan in only one map is a failure, and failure exits nonzero."""
+    import subprocess
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "analysis"))
+    from compare_maps import max_rel_diff
+    a = np.array([[1.0, np.nan], [2.0, 3.0]])
+    assert max_rel_diff(a, a) == 0.0
+    assert max_rel_diff(a, np.array([[1.0, 5.0], [2.0, 3.0]])) == np.inf
+    # A deliberately different map must make the script exit with status 1.
+    ref = np.load(REFERENCE / "map_torus32.npz")
+    n = len(ref["phi"])
+    (tmp_path / "meta.json").write_text(json.dumps({"n_phi": n, "settings": json.loads(str(ref["settings"])),
+                                                    "fundamental": False, "git_hash": "x", "git_dirty": False}))
+    with open(tmp_path / "points.jsonl", "w") as f:
+        for i in range(n):
+            for j in range(n):
+                f.write(json.dumps({"i": i, "j": j, "outer_edge": float(ref["outer_edge"][i, j]) * 1.01,
+                                    "capture_measure": float(ref["capture_measure"][i, j]),
+                                    "n_intervals": int(ref["n_intervals"][i, j]), "n_timeouts": 0,
+                                    "seconds": 0.0}) + "\n")
+    script = Path(__file__).resolve().parents[1] / "analysis" / "compare_maps.py"
+    out = subprocess.run([sys.executable, str(script), str(tmp_path), str(REFERENCE / "map_torus32.npz")],
+                         capture_output=True, text=True)
+    assert out.returncode == 1 and "FAIL" in out.stdout
