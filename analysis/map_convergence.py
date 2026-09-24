@@ -14,6 +14,13 @@ and compared with the stored map entry:
     (<= 3e-7; it falls as r0^-2 and was 5e-4 at r0 = 1000 near the diamond, E = 0.0335).
 The sample is every multi-interval point in the fundamental domain plus random others
 (seed recorded). Unlike the symmetry check, this tests numerical accuracy.
+
+The tightened recompute uses the run's own integrator (the compiled one for numba runs; scipy's is
+~400x slower). Tightening cannot expose a defect shared by both computations, so for a numba run the
+first --n-reference sample points (multi-interval first; default 1, since each costs about as
+much as a few hundred compiled profiles) are also recomputed with the independent scipy reference
+integrator at the run's own settings and must match to the same threshold. The two comparisons
+are reported separately. --reference recomputes the whole tightened sample with scipy instead.
 """
 
 import os
@@ -38,10 +45,38 @@ EDGE_THRESHOLD = 3e-6
 
 
 def recompute(args):
-    energy, phi1, phi2, settings = args
+    energy, phi1, phi2, settings, method = args
     return in_plane_profile(energy, phi1, phi2, b_min=settings["b_min"], b_max=settings["b_max"],
                             n_scan=2 * settings["n_scan"], rel_tol=settings["rel_tol"],
-                            start_radius=2 * settings.get("start_radius", 1000.0), **TIGHT_TOLERANCES)
+                            start_radius=2 * settings.get("start_radius", 1000.0), method=method,
+                            **TIGHT_TOLERANCES)
+
+
+def recompute_reference(args):
+    """The same point with the scipy reference integrator at the run's own settings."""
+    energy, phi1, phi2, settings = args
+    return in_plane_profile(energy, phi1, phi2, b_min=settings["b_min"], b_max=settings["b_max"],
+                            n_scan=settings["n_scan"], rel_tol=settings["rel_tol"],
+                            start_radius=settings.get("start_radius", 1000.0), method="reference")
+
+
+def compare_profile(prof, rec):
+    """(same structure, max relative edge difference) of a recomputed profile vs a stored record.
+
+    Structure means the whole profile: edge kinds, interval count, scan-top contact, no undecided parts.
+    """
+    same = (prof["edge_kinds"] == rec["edge_kinds"] and prof["n_intervals"] == rec["n_intervals"]
+            and prof["contact_at_scan_top"] == rec["contact_at_scan_top"]
+            and not prof["unresolved"] and not rec.get("unresolved"))
+    diff = np.max(np.abs(np.array(prof["edges"]) - rec["edges"]) / np.array(rec["edges"])) if same and rec["edges"] else np.nan
+    return same, diff
+
+
+def non_negative_int(text):
+    value = int(text)
+    if value < 0:
+        raise argparse.ArgumentTypeError(f"must be >= 0, got {value}")
+    return value
 
 
 def main():
@@ -50,6 +85,12 @@ def main():
     p.add_argument("--n-random", type=int, default=10)
     p.add_argument("--seed", type=int, default=20260924)
     p.add_argument("--workers", type=int, default=min(18, os.cpu_count() or 1))
+    p.add_argument("--reference", action="store_true",
+                   help="recompute with the scipy reference integrator instead of the run's own method "
+                        "(an independent check; ~400x slower)")
+    p.add_argument("--n-reference", type=non_negative_int, default=1,
+                   help="for a numba run: sample points also recomputed with scipy at the run's settings "
+                        "(0 turns the cross-check off)")
     args = p.parse_args()
 
     data = load_map(args.result_dir, expand_symmetry=False)
@@ -69,28 +110,44 @@ def main():
     print(f"recomputing {len(sample)} points ({len(multi)} multi-interval) with {TIGHT_TOLERANCES}, "
           f"r0 {2 * settings.get('start_radius', 1000.0):g}, n_scan {2 * settings['n_scan']} (seed {args.seed})")
 
-    jobs = [(settings["energy"], data["records"][r]["phi1"], data["records"][r]["phi2"], settings) for r in sample]
+    method = "reference" if args.reference else settings.get("method", "reference")
+    angles = [(settings["energy"], data["records"][r]["phi1"], data["records"][r]["phi2"], settings) for r in sample]
+    cross = sample[:args.n_reference] if method != "reference" else []
+    if cross:
+        print(f"cross-checking {len(cross)} of them with the scipy reference integrator at the run's settings")
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
-        tight = list(pool.map(recompute, jobs))
+        ref_futures = [pool.submit(recompute_reference, a) for a in angles[:len(cross)]]
+        tight = list(pool.map(recompute, [a + (method,) for a in angles]))
+        independent = [f.result() for f in ref_futures]
 
+    ref_worst, ref_failures = 0.0, []
+    for (i, j), prof in zip(cross, independent):
+        rec = data["records"][(i, j)]
+        same, diff = compare_profile(prof, rec)
+        if not same or diff > EDGE_THRESHOLD:
+            ref_failures.append((i, j))
+        if same and rec["edges"]:
+            ref_worst = max(ref_worst, diff)
+        print(f"  ({i:2d},{j:2d}) scipy reference vs {settings['method']}: structure "
+              f"{'identical' if same else 'DIFFERENT'}, max rel edge diff {diff:.1e}")
     worst, failures = 0.0, []
     for (i, j), prof in zip(sample, tight):
         rec = data["records"][(i, j)]
-        # Whole profile structure: edge kinds, interval count, scan-top contact, undecided parts.
-        same = (prof["edge_kinds"] == rec["edge_kinds"] and prof["n_intervals"] == rec["n_intervals"]
-                and prof["contact_at_scan_top"] == rec["contact_at_scan_top"]
-                and not prof["unresolved"] and not rec.get("unresolved"))
-        diff = np.max(np.abs(np.array(prof["edges"]) - rec["edges"]) / np.array(rec["edges"])) if same and rec["edges"] else np.nan
+        same, diff = compare_profile(prof, rec)
         if not same or diff > EDGE_THRESHOLD:
             failures.append((i, j))
         if same and rec["edges"]:
             worst = max(worst, diff)
         print(f"  ({i:2d},{j:2d}) intervals {rec['n_intervals']} -> {prof['n_intervals']}  "
               f"max rel edge diff {diff:.1e}")
+    if cross:
+        status = "PASS" if not ref_failures else f"FAIL at {ref_failures}"
+        print(f"scipy reference: structure identical at {len(cross) - len(ref_failures)}/{len(cross)}; "
+              f"max rel edge diff {ref_worst:.1e} (threshold {EDGE_THRESHOLD:.0e})  -> {status}")
     status = "PASS" if not failures else f"FAIL at {failures}"
-    print(f"structure identical at {len(sample) - len(failures)}/{len(sample)}; max rel edge diff {worst:.1e} "
-          f"(threshold {EDGE_THRESHOLD:.0e})  -> {status}")
-    if failures:
+    print(f"tightened: structure identical at {len(sample) - len(failures)}/{len(sample)}; max rel edge diff "
+          f"{worst:.1e} (threshold {EDGE_THRESHOLD:.0e})  -> {status}")
+    if failures or ref_failures:
         raise SystemExit(1)
 
 

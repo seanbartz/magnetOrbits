@@ -24,9 +24,10 @@ from physics import central
 from physics.capture import find_capture_edge
 from physics.solve import initial_state, run_trajectory
 from tests.published import bartz_shaw_2022 as paper
+from tests.validated import STAGE5_HEAD_TO_TAIL_EDGE
 
 X_HAT = np.array([1.0, 0.0, 0.0])
-OUR_EDGE = 5.7545902   # converged value (r0 = 4000 Richardson estimate 5.75459035; r0 = 1000: 5.75459017)
+OUR_EDGE = STAGE5_HEAD_TO_TAIL_EDGE   # converged value (see tests/validated.py)
 
 
 def generic_case(index):

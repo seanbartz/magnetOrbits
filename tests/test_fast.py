@@ -24,6 +24,7 @@ from physics.capture import find_capture_edge
 from physics.edges import sweep_point
 from physics.solve import equations_of_motion, incoming_leg_correction, run_trajectory
 from tests.published.bartz_shaw_2022 import ENERGY_TILDE
+from tests.validated import STAGE5_HEAD_TO_TAIL_EDGE
 
 Z = np.array([0.0, 0.0, 1.0])
 X_HAT = np.array([1.0, 0.0, 0.0])
@@ -116,7 +117,7 @@ def test_stage4_regression_reference():
 
 def test_paper_edge():
     found = find_capture_edge(ENERGY_TILDE, X_HAT, X_HAT, 5.70, 5.80, rel_tol=1e-10, method="numba")
-    assert found["edge"] == pytest.approx(5.7545902, abs=5e-7)
+    assert found["edge"] == pytest.approx(STAGE5_HEAD_TO_TAIL_EDGE, abs=5e-7)
 
 
 def test_map_reference_points():

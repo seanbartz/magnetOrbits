@@ -9,4 +9,6 @@ results/
 *.npz
 !tests/reference/*.npz
 *.log
+# figures are committed as PDF; PNG copies are local previews
+figures/*.png
 .DS_Store
