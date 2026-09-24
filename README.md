@@ -29,7 +29,23 @@ Physical units appear only in `physics/model.py` (`scales`, `physical_to_dimensi
 ## Program flow
 
 ```
-physics/model.py        U, F_2, tau_1, tau_2                    (stage 1)
+run_single.py  (CLI: one parameter point -> printed numbers, --plot)       (stage 2)
+  └─ physics/solve.py        run_trajectory: in-state, solve_ivp DOP853,  (stage 2)
+       │                     events (contact r=2, periapsis, rigorous escape, r_out)
+       ├─ physics/model.py   U, F_2, tau_1, tau_2                         (stage 1)
+       └─ physics/observables.py  E, J, |m|-1 drift, deflection angle     (stage 2)
+physics/central.py   independent -kappa/r^3 oracle: b_c, quadrature Theta  (stages 2-3)
+```
+
+Every later sweep calls `physics.solve.run_trajectory`, so any sweep point can be
+re-inspected with `run_single.py`.
+
+## Usage
+
+```bash
+python run_single.py --energy 0.03 --b 5 --preset antiparallel-z      # exact -1/r^3 case
+python run_single.py --energy 0.03 --b 6 --preset head-to-tail --plot  # paper's configuration
+python run_single.py --energy 0.1 --b 4 --m1 1 0 0 --m2 0 1 0          # any lab-frame moments
 ```
 
 ## Tests

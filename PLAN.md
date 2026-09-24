@@ -37,7 +37,7 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   *Check:* $\mathbf F=-\nabla U$, $\boldsymbol\tau=-\hat\mu\times\partial_{\hat\mu}U$ by finite
   differences at random configurations; $\boldsymbol\tau_1+\boldsymbol\tau_2+\mathbf r\times\mathbf F=0$
   to machine precision.
-- [ ] **2. Single trajectory** (`physics/solve.py`, `run_single.py`), $+z/-z$ case.
+- [x] **2. Single trajectory** (`physics/solve.py`, `run_single.py`), $+z/-z$ case.
   *Check:* orientations exactly fixed; $\chi(b)$ vs independent quadrature of the $-1/r^3$
   orbit integral; large-$b$ limit $2/\tilde E\tilde b^3$; drift of $E$, $\mathbf J$, $|\hat\mu|$;
   convergence in rtol and starting radius $r_0$.
