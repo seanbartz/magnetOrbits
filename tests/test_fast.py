@@ -130,8 +130,11 @@ def test_map_reference_points():
         assert rec["capture_measure"] == pytest.approx(ref["capture_measure"][i, j], rel=2e-6)
 
 
+@pytest.mark.slow
 def test_speedup():
-    """Report-style check: compiled path at least 50x faster per trajectory (measured ~300x)."""
+    """Benchmark, not a correctness test (hence `slow`): wall-clock time depends on machine load
+    and on whether the Numba cache is warm. Measured ~380x on the Mac Studio; the 10x floor only
+    catches a gross regression (e.g. the compiled path silently falling back to Python)."""
     import time
     energy, b, m1, m2 = generic_cases()[0]
     run_trajectory(energy, b, m1, m2, method="numba")          # compile / warm cache
@@ -144,7 +147,7 @@ def test_speedup():
         run_trajectory(energy, b, m1, m2, method="numba")
     t_fast = (time.perf_counter() - t0) / 30
     print(f"reference {t_ref * 1e3:.1f} ms, numba {t_fast * 1e3:.2f} ms, speedup {t_ref / t_fast:.0f}x")
-    assert t_ref / t_fast > 50
+    assert t_ref / t_fast > 10
 
 
 def test_compare_maps_nan_and_exit_status(tmp_path):
