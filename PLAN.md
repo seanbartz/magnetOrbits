@@ -82,11 +82,26 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   - [x] **8a. Strip grids** in `sweep.py` (`--strip`, `--along-pi`, `--across-pi`).
     *Check:* strip points on the torus grid reproduce `map_torus32.npz` (incl. a window point);
     resume refuses a changed grid.
-  - [ ] **8b. Antiparallel strip**, $s\in[0,\pi)$ (64), $d\in[-5\pi/64,5\pi/64]$ (81).
-    *Check:* 4x scan refinement identical; tighter-numerics spot check.
-  - [ ] **8c. Mirror strip**, $s\in[0,\pi)$ (64), $d\in[-3\pi/16,3\pi/32]$ (145). Same checks.
+  - [x] **8b. Antiparallel strip**, $s\in[0,\pi)$ (64), $d\in[-5\pi/64,5\pi/64]$ (81).
+    *Check:* $b_{\rm out}$ identical to $7.7\times10^{-7}$ under a 4x finer $b$ scan (PASS). Interval
+    structure differs at 16/5184 points, all near $s\to0,\pi$ where the strip crosses the mirror
+    band (see 8c). *Result:* the dip is a smooth cusp, resolved: $b_{\rm out}=4.69$–$4.72$ on the
+    line, full width at half depth $0.031\pi$ ($5.6^\circ$), $b_{\rm out}(d)-b_{\rm out}(0)\propto|d|^{0.57}$,
+    the same at every $s$.
+  - [~] **8c. Mirror strip**, $s\in[0,\pi)$ (64), $d\in[-3\pi/16,3\pi/32]$ (145).
+    *Check:* $b_{\rm out}$ identical to $7.7\times10^{-7}$ under the 4x scan (PASS). Interval counts
+    and capture measure do **not** converge: the 4x scan changes the structure at 884/9280 points
+    (thin escape windows at $b\approx0.15$–$1.35$, width $0.02$–$0.04$, below the $\Delta b=0.05$ scan),
+    and at one point a 64x scan splits a window into three (sub-windows at $\Delta b\sim10^{-3}$).
+    *Result:* the "trough" is a band $-0.075\pi\lesssim d\lesssim0$ below the mirror line, bounded on
+    its low side by a sharp jump in $b_{\rm out}$; escape windows fill the band. Near
+    $s\to0,\pi$ (head-to-head / tail-to-tail) $b_{\rm out}$ drops to $2.46$ at
+    $(\phi_1,\phi_2)=(0.969\pi,1.975\pi)$, far below the torus minimum 4.18.
   - [ ] **8d. Instability hypothesis:** growth of a small offset from exact antiparallel along the
-    trajectory, compared with the measured dip width.
+    trajectory, compared with the measured dip width. *First probe:* the spin-mismatch
+    amplification is linear and reaches $A\sim10^2$–$10^3$ near $b_{\rm out}$, which predicts widths
+    $\sim10^{-3}$–$10^{-2}$ rad against the measured $0.1$ rad (smooth cusp), so a simple
+    $1/A$ picture does not explain the dip.
   - [ ] **8e. Notebook section** for stage 8 and updated summary.
 - [ ] **6a. $\tilde b_c(\tilde E)$** for head-to-tail vs. locked and $+z/-z$ curves (deferred).
 
