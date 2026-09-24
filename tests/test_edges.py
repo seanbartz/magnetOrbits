@@ -109,3 +109,57 @@ def test_regression_against_production_map():
         assert rec["n_intervals"] == ref["n_intervals"][i, j]
         assert rec["outer_edge"] == pytest.approx(ref["outer_edge"][i, j], rel=1e-9)
         assert rec["capture_measure"] == pytest.approx(ref["capture_measure"][i, j], rel=1e-9)
+
+
+# --- undecided (timeout) handling and sweep bookkeeping (PR #4 review) ----------------------
+
+def scripted_outcomes(monkeypatch, rule):
+    """Replace run_trajectory inside physics.edges by outcome = rule(b)."""
+    import physics.edges as edges_module
+    monkeypatch.setattr(edges_module, "run_trajectory",
+                        lambda energy, b, m1, m2, **kw: {"outcome": rule(b)})
+
+
+def test_timeout_inside_bracket_is_not_an_edge(monkeypatch):
+    # Grid spacing 0.1: bracket [2.9, 3.0] contains a timeout band [2.94, 2.97) that the first
+    # midpoint (2.95) hits, so the edge between contact (< 2.94) and escape (>= 2.97) is undecided.
+    scripted_outcomes(monkeypatch, lambda b: "timeout" if 2.94 <= b < 2.97 else ("contact" if b < 2.94 else "escape"))
+    prof = capture_profile(0.03, Z, -Z, b_min=1.0, b_max=5.0, n_scan=41, rel_tol=1e-6)
+    assert len(prof["edges"]) == 0
+    assert prof["unresolved"] and prof["n_intervals"] == -1
+    assert prof["intervals"] is None and np.isnan(prof["capture_measure"]) and np.isnan(prof["outer_edge"])
+    assert prof["n_timeouts"] >= 1
+
+
+def test_timeout_on_scan_grid_is_undecided(monkeypatch):
+    # grid spacing 0.1: b = 3.0 times out between contact (2.9) and escape (3.1).
+    scripted_outcomes(monkeypatch, lambda b: "timeout" if abs(b - 3.0) < 1e-9 else ("contact" if b < 3.0 else "escape"))
+    prof = capture_profile(0.03, Z, -Z, b_min=1.0, b_max=5.0, n_scan=41, rel_tol=1e-6)
+    assert prof["scan_codes"].count("t") == 1
+    assert prof["intervals"] is None and prof["n_intervals"] == -1 and np.isnan(prof["outer_edge"])
+
+
+def test_outer_edge_kept_when_undecided_region_is_below_it(monkeypatch):
+    scripted_outcomes(monkeypatch, lambda b: "timeout" if abs(b - 2.0) < 1e-9 else ("contact" if b < 4.0 else "escape"))
+    prof = capture_profile(0.03, Z, -Z, b_min=1.0, b_max=5.0, n_scan=41, rel_tol=1e-6)
+    assert prof["outer_edge"] == pytest.approx(4.0, rel=1e-6)
+    assert np.isnan(prof["capture_measure"])
+
+
+def test_odd_grid_rejected():
+    with pytest.raises(ValueError):
+        symmetry_orbit(0, 0, 7)
+
+
+def test_resume_retries_failed_points_and_checks_run_mode(tmp_path):
+    import sweep
+    points = tmp_path / "points.jsonl"
+    points.write_text(json.dumps({"i": 0, "j": 1, "outer_edge": 5.0}) + "\n"
+                      + json.dumps({"i": 2, "j": 3, "error": "RuntimeError()"}) + "\n")
+    assert sweep.completed_points(points) == {(0, 1)}
+    meta = tmp_path / "meta.json"
+    meta.write_text(json.dumps({"settings": {"energy": 0.1}, "n_phi": 8, "fundamental": False}))
+    sweep.check_resume(meta, {"energy": 0.1}, 8, False)
+    for args in [({"energy": 0.2}, 8, False), ({"energy": 0.1}, 16, False), ({"energy": 0.1}, 8, True)]:
+        with pytest.raises(SystemExit):
+            sweep.check_resume(meta, *args)

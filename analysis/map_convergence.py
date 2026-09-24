@@ -68,7 +68,10 @@ def main():
     worst, failures = 0.0, []
     for (i, j), prof in zip(sample, tight):
         rec = data["records"][(i, j)]
-        same = prof["edge_kinds"] == rec["edge_kinds"]
+        # Whole profile structure: edge kinds, interval count, scan-top contact, undecided parts.
+        same = (prof["edge_kinds"] == rec["edge_kinds"] and prof["n_intervals"] == rec["n_intervals"]
+                and prof["contact_at_scan_top"] == rec["contact_at_scan_top"]
+                and not prof["unresolved"] and not rec.get("unresolved"))
         diff = np.max(np.abs(np.array(prof["edges"]) - rec["edges"]) / np.array(rec["edges"])) if same and rec["edges"] else np.nan
         if not same or diff > EDGE_THRESHOLD:
             failures.append((i, j))
