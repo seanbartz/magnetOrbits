@@ -1,0 +1,11 @@
+[project]
+name = "magnet-orbits"
+version = "0.2.0"
+description = "Scattering and capture of two free, spinning, uniformly magnetized spheres"
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.21", "scipy>=1.9", "matplotlib>=3.5"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["archive", "paper"]
+markers = ["slow: longer physics-validation runs (deselect with -m 'not slow')"]
