@@ -106,9 +106,7 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
     Uncertainty exponent $f(\epsilon)\propto\epsilon^\alpha$ ($D=1-\alpha$), $5\times10^4$ samples per point,
     fit over $\epsilon\le L/30$. *Check:* the controls with one smooth edge give
     $\alpha=0.990\pm0.020$ ($+z/-z$) and $0.971\pm0.017$ (antiparallel line), with counts
-    Poisson-consistent with $f=2\epsilon/L$. *Result:* band points give $\alpha=0.327\pm0.003$ and
-    $0.144\pm0.003$ ($D\approx0.67$, $0.86$): **fractal boundary**. A two-edge window in the band
-    gives $1.03\pm0.02$. Edges resolved grow 8 → 214 and 6 → 260 over a 256x scan refinement, while
+    Poisson-consistent with $f=2\epsilon/L$. *Result:* band points give $\alpha=0.351\pm0.003$ and $0.266\pm0.003$ ($D\approx0.65$, $0.73$), so the band has a **fractal boundary**; a two-edge window in the band gives $0.998\pm0.016$. The dimension is local: an earlier run that sampled only the inner 64% of band B's interval (fixed in the PR #7 self-review) gave $0.14$. Edges resolved grow 8 → 214 and 6 → 260 over a 256x scan refinement, while
     the capture measure changes by $\lesssim2$–$3\%$ (fat fractal). Robust to rtol $10^{-12}$ and
     $r_0=128000$ (counts Poisson-consistent; 0.5–0.7% of individual samples flip, as expected
     near a fractal set).
