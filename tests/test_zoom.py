@@ -110,3 +110,13 @@ def test_sweep_strip_records_grid():
                                 "across_pi": [-0.1, 0.1, 5]}
     finally:
         shutil.rmtree(ROOT / "results" / name, ignore_errors=True)
+
+
+@pytest.mark.parametrize("key,i,j", [("strip_anti", 16, 40), ("strip_mirror", 48, 130), ("patch_tt", 48, 48)])
+def test_regression_against_stored_zoom_maps(key, i, j):
+    """Recompute stored stage-8 points (tests/reference/zoom_maps.npz) at their recorded settings."""
+    zoom = np.load(ROOT / "tests" / "reference" / "zoom_maps.npz")
+    meta = json.loads(str(zoom[f"{key}__meta"]))
+    rec = strip_point(meta["settings"]["energy"], i, j, meta["grid"], meta["settings"])
+    assert rec["n_intervals"] == zoom[f"{key}__n_intervals"][i, j]
+    assert rec["outer_edge"] == pytest.approx(zoom[f"{key}__outer_edge"][i, j], rel=1e-9)

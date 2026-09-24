@@ -102,7 +102,25 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
     amplification is linear and reaches $A\sim10^2$–$10^3$ near $b_{\rm out}$, which predicts widths
     $\sim10^{-3}$–$10^{-2}$ rad against the measured $0.1$ rad (smooth cusp), so a simple
     $1/A$ picture does not explain the dip.
-  - [ ] **8e. Notebook section** for stage 8 and updated summary.
+  - [x] **8f. Fine structure of the window band** (`physics/fractal.py`, `analysis/uncertainty.py`).
+    Uncertainty exponent $f(\epsilon)\propto\epsilon^\alpha$ ($D=1-\alpha$), $5\times10^4$ samples per point,
+    fit over $\epsilon\le L/30$. *Check:* the controls with one smooth edge give
+    $\alpha=0.990\pm0.020$ ($+z/-z$) and $0.971\pm0.017$ (antiparallel line), with counts
+    Poisson-consistent with $f=2\epsilon/L$. *Result:* band points give $\alpha=0.327\pm0.003$ and
+    $0.144\pm0.003$ ($D\approx0.67$, $0.86$): **fractal boundary**. A two-edge window in the band
+    gives $1.03\pm0.02$. Edges resolved grow 8 → 214 and 6 → 260 over a 256x scan refinement, while
+    the capture measure changes by $\lesssim2$–$3\%$ (fat fractal). Robust to rtol $10^{-12}$ and
+    $r_0=128000$ (counts Poisson-consistent; 0.5–0.7% of individual samples flip, as expected
+    near a fractal set).
+  - [x] **8g. Tail-to-tail corner** (patches at $\pi/512$ and $\pi/8192$ around $(\pi,0)$).
+    *Check:* $b_{\rm out}$ converged to $9.3\times10^{-7}$ on the coarse patch. In the fine patch
+    0.7% of points gain a thin contact sliver above $b_{\rm out}$ under the 4x scan, so $b_{\rm out}$ is
+    a lower bound there. *Result:* the lowest outer edge, a wedge with $b_{\rm out}\approx2.1$–$2.5$,
+    sits where the band's lower boundary crosses the antiparallel cusp, at
+    $(\phi_1,\phi_2)\approx(0.975\pi,-0.025\pi)$. The minimum is resolution-limited
+    (2.46 → 2.17 → 2.13). Exact tail-to-tail is 4.18.
+  - [x] **8e. Notebook section 10** for stage 8 and updated summary (section 11), from
+    `tests/reference/zoom_maps.npz` and `uncertainty_summary.json`.
 - [ ] **6a. $\tilde b_c(\tilde E)$** for head-to-tail vs. locked and $+z/-z$ curves (deferred).
 
 ## Findings so far
