@@ -16,10 +16,9 @@ The staged plan and its validation status are in [PLAN.md](PLAN.md).
 Scales: length $R$, energy $U_0=\mu_0\mu^2/4\pi R^3$, mass $m/2$,
 time $t_0=\sqrt{(m/2)R^2/U_0}$. With $\mathbf r=\mathbf r_2-\mathbf r_1$:
 
-$$\ddot{\mathbf r}=\mathbf F_2,\qquad \dot{\hat\mu}_i=\boldsymbol\omega_i\times\hat\mu_i,\qquad
-\tilde I\,\dot{\boldsymbol\omega}_i=\boldsymbol\tau_i,\qquad \tilde I=2\beta=4/5,$$
+$\ddot{\mathbf r}=\mathbf F_2$, $\dot{\hat\mu}_i=\boldsymbol\omega_i\times\hat\mu_i$, $\tilde I\,\dot{\boldsymbol\omega}_i=\boldsymbol\tau_i$, with $\tilde I=2\beta=4/5$ and
 
-$$U=-\frac{1}{r^3}\Big[3(\hat\mu_1\!\cdot\!\hat r)(\hat\mu_2\!\cdot\!\hat r)-\hat\mu_1\!\cdot\!\hat\mu_2\Big].$$
+$U=-\frac{1}{r^3}\Big[3(\hat\mu_1\cdot\hat r)(\hat\mu_2\cdot\hat r)-\hat\mu_1\cdot\hat\mu_2\Big]$.
 
 The inputs are $\tilde E$ (relative kinetic energy $/U_0$), $\tilde b=b/R$, and the initial
 moment directions, defined at $t\to-\infty$ for a non-spinning in-state (the torque acting
