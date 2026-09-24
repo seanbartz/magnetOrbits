@@ -114,11 +114,12 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
     near a fractal set).
   - [x] **8g. Tail-to-tail corner** (patches at $\pi/512$ and $\pi/8192$ around $(\pi,0)$).
     *Check:* $b_{\rm out}$ converged to $9.3\times10^{-7}$ on the coarse patch. In the fine patch
-    0.7% of points gain a thin contact sliver above $b_{\rm out}$ under the 4x scan, so $b_{\rm out}$ is
-    a lower bound there. *Result:* the lowest outer edge, a wedge with $b_{\rm out}\approx2.1$–$2.5$,
-    sits where the band's lower boundary crosses the antiparallel cusp, at
-    $(\phi_1,\phi_2)\approx(0.975\pi,-0.025\pi)$. The minimum is resolution-limited
-    (2.46 → 2.17 → 2.13). Exact tail-to-tail is 4.18.
+    (re-centered after PR #7 review; it was off-center) 1.2% of points gain a thin contact sliver
+    above $b_{\rm out}$ under the 4x scan, so $b_{\rm out}$ is a lower bound there. *Result:* a low region,
+    $b_{\rm out}\approx2.2$–$2.5$, bounded by two sharp edges that meet at the antiparallel cusp; the
+    lowest outer edge, $2.13$, lies at that corner, $(\phi_1,\phi_2)\approx(0.975\pi,-0.025\pi)$.
+    The deepest pixel went 2.46 (strip) → 2.17 (coarse patch) → 2.13 (fine patch, both runs).
+    Exact tail-to-tail is 4.18.
   - [x] **8e. Notebook section 10** for stage 8 and updated summary (section 11), from
     `tests/reference/zoom_maps.npz` and `uncertainty_summary.json`.
 - [ ] **6a. $\tilde b_c(\tilde E)$** for head-to-tail vs. locked and $+z/-z$ curves (deferred).

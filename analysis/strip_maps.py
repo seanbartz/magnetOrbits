@@ -12,7 +12,7 @@ What is and is not converged (stage 8 findings): b_out agrees with a 4x finer b 
 both strips and the tail-to-tail patch, so those b_out panels are results. Interval counts are only
 lower bounds in the escape-window band, where thin windows (and sub-windows) sit below the scan
 resolution; the boundary there is fractal (analysis/uncertainty.py). In the fine patch at the band
-edge / antiparallel crossing, 0.7% of points also gain a thin contact sliver above b_out under the
+edge / antiparallel crossing, 1.2% of points also gain a thin contact sliver above b_out under the
 finer scan, so b_out is a lower bound there too.
 """
 
