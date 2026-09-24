@@ -37,7 +37,9 @@ run_single.py  (CLI: one parameter point -> printed numbers, --plot)       (stag
        ├─ physics/model.py   U, F_2, tau_1, tau_2                         (stage 1)
        └─ physics/observables.py  E, J, |m|-1 drift, deflection angle     (stage 2)
 sweep.py  (orientation maps over (phi1, phi2), 18 workers, resumable)     (stage 6b)
-  └─ physics/edges.py        capture_profile: scan b + bisect every edge;
+  └─ physics/edges.py        capture_profile: scan b, bisect each sign-changing
+                             scan cell (one edge per cell: counts are lower
+                             bounds; validate by refining the scan);
                              symmetry reduction; load_map                    (stage 6b)
        └─ physics/solve.run_trajectory   (same code path as run_single.py)
 analysis/map_checks.py   full-torus symmetry check + map figures           (stage 6b)
