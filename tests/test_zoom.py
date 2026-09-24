@@ -145,3 +145,48 @@ def test_sweep_rejects_bad_strip_counts(along):
                          cwd=ROOT, capture_output=True, text=True, timeout=60)
     shutil.rmtree(ROOT / "results" / "pytest_bad_counts", ignore_errors=True)
     assert out.returncode != 0 and "--along-pi" in out.stderr + out.stdout
+
+
+def write_strip_run(directory, along_n, across, records_fn):
+    grid = {"kind": "strip", "line": "mirror", "along_pi": [0.0, 1.0, along_n], "across_pi": across}
+    directory.mkdir()
+    (directory / "meta.json").write_text(json.dumps({"grid": grid, "n_phi": 32, "fundamental": False,
+                                                     "settings": {"energy": 0.1}, "git_hash": "x", "git_dirty": False}))
+    with open(directory / "points.jsonl", "w") as f:
+        for i in range(along_n):
+            for j in range(int(across[2])):
+                f.write(json.dumps(records_fn(i, j)) + "\n")
+
+
+def good_record(i, j):
+    return {"i": i, "j": j, "outer_edge": 5.0 + 0.1 * j, "capture_measure": 4.9, "n_intervals": 1, "n_timeouts": 0,
+            "edges": [5.0 + 0.1 * j], "edge_kinds": ["ce"], "contact_at_scan_top": False, "unresolved": [],
+            "seconds": 0.0}
+
+
+def test_unresolved_profiles_fail_completeness(tmp_path):
+    """A timeout inside a profile gives a *successful* record with unresolved ranges: not complete."""
+    def records(i, j):
+        rec = good_record(i, j)
+        if (i, j) == (1, 1):
+            rec.update(unresolved=[[2.9, 3.0]], n_intervals=-1, capture_measure=None, outer_edge=None, n_timeouts=1)
+        return rec
+    for name in ("a", "b"):
+        write_strip_run(tmp_path / name, 2, [-0.1, 0.1, 3], records)
+    from physics.edges import completeness
+    assert completeness(load_map(tmp_path / "a"))["unresolved"] == [(1, 1)]
+    compare = subprocess.run([sys.executable, str(ROOT / "analysis" / "compare_maps.py"), str(tmp_path / "a"),
+                              str(tmp_path / "b")], capture_output=True, text=True)
+    assert compare.returncode == 1 and "unresolved" in compare.stdout
+    checks = subprocess.run([sys.executable, str(ROOT / "analysis" / "map_checks.py"), str(tmp_path / "a")],
+                            capture_output=True, text=True)
+    assert checks.returncode == 1 and "INCOMPLETE" in checks.stdout
+
+
+def test_strip_maps_handles_a_single_row(tmp_path, monkeypatch):
+    sys.path.insert(0, str(ROOT / "analysis"))
+    import strip_maps
+    write_strip_run(tmp_path / "one_row", 1, [-0.1, 0.1, 3], good_record)
+    monkeypatch.setattr(strip_maps.Path, "resolve", lambda self: tmp_path / "analysis" / "x.py")   # figures -> tmp
+    written = strip_maps.figures(tmp_path / "one_row")
+    assert all(p.exists() for p in written)

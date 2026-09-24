@@ -300,6 +300,29 @@ def load_map(result_dir, expand_symmetry=True):
     return data
 
 
+def completeness(data):
+    """Why a loaded run cannot be used as a finished map, if at all.
+
+    Returns dict(missing=[...], failed=[...], unresolved=[...]) of (i, j) keys: expected points
+    with no record, points whose worker raised, and points whose profile has unresolved
+    (timeout) ranges -- a successful record, but with undecided intervals (n_intervals = -1).
+    The run is complete only if all three lists are empty.
+    """
+    missing = sorted(expected_points(data["meta"]) - set(data["records"]))
+    failed = sorted((e["i"], e["j"]) for e in data["errors"])
+    unresolved = sorted(k for k, rec in data["records"].items() if rec.get("unresolved"))
+    return {"missing": missing, "failed": failed, "unresolved": unresolved}
+
+
+def completeness_problem(data):
+    """One-line description of what makes the run incomplete, or None if it is complete."""
+    c = completeness(data)
+    if not any(c.values()):
+        return None
+    return (f"{len(c['missing'])} expected points missing, {len(c['failed'])} failed, "
+            f"{len(c['unresolved'])} with unresolved (timeout) ranges")
+
+
 def expected_points(meta):
     """Every (i, j) a complete run must contain (torus: full or fundamental domain; strip: all)."""
     grid = meta.get("grid", {"kind": "torus"})

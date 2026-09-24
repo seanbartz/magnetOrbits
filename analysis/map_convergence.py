@@ -31,7 +31,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from physics.edges import expected_points, fundamental_domain, in_plane_profile, load_map   # noqa: E402
+from physics.edges import completeness_problem, expected_points, fundamental_domain, in_plane_profile, load_map   # noqa: E402
 
 TIGHT_TOLERANCES = dict(rtol=1e-12, atol=1e-14)
 EDGE_THRESHOLD = 3e-6
@@ -56,10 +56,9 @@ def main():
     settings = data["meta"]["settings"]
     # Refuse partial or failed maps: sampling only what exists could "pass" on few or no points.
     expected = expected_points(data["meta"])
-    missing = expected - set(data["records"])
-    if missing or data["errors"]:
-        print(f"INCOMPLETE map: {len(missing)} of {len(expected)} points missing, "
-              f"{len(data['errors'])} failed; resume the sweep first  -> FAIL")
+    problem = completeness_problem(data)
+    if problem:
+        print(f"INCOMPLETE map: {problem}; resume or rerun the sweep first  -> FAIL")
         raise SystemExit(1)
     # Sample pool: torus -> one point per symmetry orbit; strip -> every point.
     reps = sorted(expected) if data["grid"]["kind"] == "strip" else fundamental_domain(data["meta"]["n_phi"])

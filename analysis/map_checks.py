@@ -28,7 +28,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from physics import central                     # noqa: E402
-from physics.edges import expected_points, load_map, symmetry_orbit   # noqa: E402
+from physics.edges import completeness, load_map, symmetry_orbit   # noqa: E402
 
 EDGE_RTOL = 2e-6
 
@@ -109,11 +109,13 @@ def main():
 
     # A partial run (--limit, failed points) must not pass or be plotted: the symmetry check only
     # compares partners that exist, so missing points would otherwise go unnoticed.
-    expected = expected_points(data["meta"])
-    missing = expected - set(data["records"])
-    if missing or data["errors"]:
-        print(f"INCOMPLETE map: {len(missing)} of {len(expected)} expected points missing, "
-              f"{len(data['errors'])} failed (e.g. {sorted(missing)[:5]}); resume the sweep first  -> FAIL")
+    # Undecided profiles (timeouts inside capture_profile) are successful records with
+    # unresolved ranges; they must not pass either, on the torus or on a strip.
+    c = completeness(data)
+    if any(c.values()):
+        print(f"INCOMPLETE map: {len(c['missing'])} expected points missing (e.g. {c['missing'][:5]}), "
+              f"{len(c['failed'])} failed, {len(c['unresolved'])} with unresolved (timeout) ranges "
+              f"(e.g. {c['unresolved'][:5]})  -> FAIL")
         raise SystemExit(1)
     if strip:
         counts = {int(k): int((data["n_intervals"] == k).sum()) for k in np.unique(data["n_intervals"])}

@@ -25,7 +25,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from physics.edges import expected_points, load_map   # noqa: E402
+from physics.edges import completeness_problem, load_map   # noqa: E402
 
 RTOL = 2e-6
 
@@ -62,10 +62,10 @@ def compare_edge_lists(new_records, ref_records):
 
 
 def require_complete(data, label):
-    """Exit 1 unless the run has every expected point and no failed records."""
-    missing = expected_points(data["meta"]) - set(data["records"])
-    if missing or data["errors"]:
-        print(f"INCOMPLETE {label}: {len(missing)} expected points missing, {len(data['errors'])} failed  -> FAIL")
+    """Exit 1 unless the run has every expected point, no failures and no unresolved profiles."""
+    problem = completeness_problem(data)
+    if problem:
+        print(f"INCOMPLETE {label}: {problem}  -> FAIL")
         raise SystemExit(1)
 
 
