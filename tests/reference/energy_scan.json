@@ -414,12 +414,12 @@
    "detail": "interval counts identical: True; max rel b_out diff 5.9e-07"
   },
   {
-   "name": "provenance (clean, unmixed)",
+   "name": "provenance",
    "pass": true,
-   "detail": "dirty or mixed runs: []"
+   "detail": "dirty or mixed runs: []; run commits ['31bd539c', '86632691']; runtime code differs from 7b7de66b at: []"
   }
  ],
- "analysis_git_hash": "31bd539cd03ad95a65bd807a73b4448661632cd3",
+ "analysis_git_hash": "7b7de66bfb40e2358fc2d3562122f4a4b1722b03",
  "analysis_git_dirty": false,
- "created": "2026-09-24 14:26:37"
+ "created": "2026-09-24 15:22:37"
 }
