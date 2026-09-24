@@ -74,7 +74,8 @@ python sweep.py --name fund64 --n-phi 64 --fundamental     # symmetry-reduced do
 python analysis/map_checks.py results/torus32              # checks + figures/
 ```
 
-Progress notebook (open in Jupyter, or re-execute from the shell):
+Progress notebook (open in Jupyter, or re-execute from the shell; needs the optional
+`notebook` dependencies, `pip install -e ".[notebook]"`):
 
 ```bash
 jupyter nbconvert --to notebook --execute --inplace notebooks/progress_summary.ipynb
