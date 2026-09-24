@@ -9,7 +9,11 @@ Background: [Bartz & Shaw, arXiv:2212.00876](https://arxiv.org/abs/2212.00876) (
 LaTeX in `paper/`). The earlier attempt at this project is kept in `archive/`, for
 reference only.
 
-The staged plan and its validation status are in [PLAN.md](PLAN.md).
+The staged plan and its validation status are in [PLAN.md](PLAN.md). The progress notebook
+[notebooks/progress_summary.ipynb](notebooks/progress_summary.ipynb) walks through every
+validated stage, with equations, figures and an interactive single-trajectory explorer. It
+imports everything from `physics/`, is extended at each stage, and runs top to bottom in
+about 15 s.
 
 ## Dimensionless variables
 
@@ -68,6 +72,12 @@ direction; defaults to the paper energy $\tilde E=0.033501$):
 python sweep.py --name torus32 --n-phi 32 --method numba   # full torus (~7 s; scipy: ~34 min)
 python sweep.py --name fund64 --n-phi 64 --fundamental     # symmetry-reduced domain
 python analysis/map_checks.py results/torus32              # checks + figures/
+```
+
+Progress notebook (open in Jupyter, or re-execute from the shell):
+
+```bash
+jupyter nbconvert --to notebook --execute --inplace notebooks/progress_summary.ipynb
 ```
 
 ## Tests

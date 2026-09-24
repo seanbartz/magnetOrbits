@@ -1,6 +1,9 @@
 # PLAN — scattering and capture of two free magnetic spheres
 
-Approved 2026-09-23. Increments are checked off as their validation passes.
+Approved 2026-09-23. Increments are checked off as their validation passes. Each finished
+stage also gets a section in `notebooks/progress_summary.ipynb` (explanation, equations,
+validation figures from code imported from `physics/`, results table, next steps), committed
+with the stage. The notebook covers stages 1–7 as of 2026-09-24.
 
 ## Setup
 
