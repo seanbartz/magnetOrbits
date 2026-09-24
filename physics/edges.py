@@ -26,8 +26,10 @@ Limits of the method (report, don't hide)
 * The measure is over [b_min, b_max], not [0, inf): b < b_min is not sampled (b = 0 need
   not collide: side-by-side parallel moments repel), and contact at b_max is flagged via
   `contact_at_scan_top` rather than silently truncated.
-* A timeout (long-lived complex) at a grid point is recorded as undecided ("t"); no
-  bisection is done across it.
+* A timeout (long-lived complex) is never turned into an edge. At a scan point it is recorded
+  as "t"; inside a bisection bracket the bracket is recorded as unresolved. If anything is
+  undecided, the interval list, interval count and capture measure are reported as undecided
+  (None / -1 / nan), and the outer edge only if it lies above every undecided location.
 
 Also defines the in-plane parameterization used by the 6b maps:
     m_i = (cos phi_i, sin phi_i, 0),  phi measured from the incoming direction +x at t -> -inf.
@@ -55,32 +57,42 @@ def capture_profile(energy, m1, m2, b_min=0.05, b_max=10.0, n_scan=200, rel_tol=
         edges               sorted array of edge positions
         edge_kinds          "ce" (contact below, escape above) or "ec", per edge
         intervals           list of (lo, hi) contact intervals within [b_min, b_max]
-        capture_measure     total length of the contact intervals
-        outer_edge          largest "ce" edge (nan if nothing collides)
-        n_intervals         number of contact intervals
+                            (None if anything is undecided)
+        capture_measure     total length of the contact intervals (nan if undecided)
+        outer_edge          largest "ce" edge (nan if nothing collides, or if an undecided
+                            location lies above it)
+        n_intervals         number of contact intervals (-1 if undecided)
+        unresolved          list of (lo, hi) b-ranges left undecided by timeouts
         scan_codes          string of outcome codes on the scan grid ("c", "e", "t")
         contact_at_scan_top True if b_max still collides (edge beyond the scan)
-        n_timeouts, n_runs
+        n_timeouts          timeouts anywhere (scan grid and bisection), n_runs
     """
     n_runs = 0
+    n_timeouts = 0
 
     def code(b):
-        nonlocal n_runs
+        nonlocal n_runs, n_timeouts
         n_runs += 1
         res = run_trajectory(energy, b, m1, m2, stop="escape", **trajectory_kwargs)
-        return OUTCOME_CODE[res["outcome"]]
+        c = OUTCOME_CODE[res["outcome"]]
+        n_timeouts += c == "t"
+        return c
 
     # 1. Uniform scan.
     grid = np.linspace(b_min, b_max, n_scan)
     codes = [code(b) for b in grid]
 
-    # 2. Bisect every c/e sign change (never across an undecided point).
+    # 2. Bisect every c/e sign change. A timeout at a midpoint leaves the bracket
+    #    unresolved (recorded, never turned into an edge).
     edges, kinds = [], []
+    unresolved = [(grid[max(k - 1, 0)], grid[min(k + 1, n_scan - 1)])
+                  for k, c in enumerate(codes) if c == "t"]
     for k in range(n_scan - 1):
         lo_code, hi_code = codes[k], codes[k + 1]
         if {lo_code, hi_code} != {"c", "e"}:
             continue
         lo, hi = grid[k], grid[k + 1]
+        resolved = True
         while hi - lo > rel_tol * 0.5 * (lo + hi):
             mid = 0.5 * (lo + hi)
             mid_code = code(mid)
@@ -88,31 +100,43 @@ def capture_profile(energy, m1, m2, b_min=0.05, b_max=10.0, n_scan=200, rel_tol=
                 lo = mid
             elif mid_code == hi_code:
                 hi = mid
-            else:        # timeout inside the bracket: stop refining this edge
+            else:
+                resolved = False
                 break
-        edges.append(0.5 * (lo + hi))
-        kinds.append(lo_code + hi_code)
+        if resolved:
+            edges.append(0.5 * (lo + hi))
+            kinds.append(lo_code + hi_code)
+        else:
+            unresolved.append((lo, hi))
 
-    # 3. Contact intervals bounded by the edges (and by the scan ends).
-    intervals = []
-    start = b_min if codes[0] == "c" else None
-    for edge, kind in zip(edges, kinds):
-        if kind == "ec":
-            start = edge
-        elif start is not None:
-            intervals.append((start, edge))
-            start = None
-    if start is not None:
-        intervals.append((start, b_max))
-
+    # 3. Contact intervals bounded by the edges (and by the scan ends), only if nothing is
+    #    undecided; otherwise the interval structure is unknown and reported as such.
     ce_edges = [e for e, k in zip(edges, kinds) if k == "ce"]
+    outer_edge = max(ce_edges) if ce_edges else np.nan
+    if unresolved:
+        intervals, capture_measure, n_intervals = None, np.nan, -1
+        if ce_edges and outer_edge < max(hi for _, hi in unresolved):
+            outer_edge = np.nan
+    else:
+        intervals = []
+        start = b_min if codes[0] == "c" else None
+        for edge, kind in zip(edges, kinds):
+            if kind == "ec":
+                start = edge
+            elif start is not None:
+                intervals.append((start, edge))
+                start = None
+        if start is not None:
+            intervals.append((start, b_max))
+        capture_measure = float(sum(hi - lo for lo, hi in intervals))
+        n_intervals = len(intervals)
+
     return {
         "edges": np.array(edges), "edge_kinds": kinds, "intervals": intervals,
-        "capture_measure": float(sum(hi - lo for lo, hi in intervals)),
-        "outer_edge": max(ce_edges) if ce_edges else np.nan,
-        "n_intervals": len(intervals), "scan_codes": "".join(codes),
+        "capture_measure": capture_measure, "outer_edge": outer_edge,
+        "n_intervals": n_intervals, "unresolved": unresolved, "scan_codes": "".join(codes),
         "contact_at_scan_top": codes[-1] == "c",
-        "n_timeouts": codes.count("t"), "n_runs": n_runs,
+        "n_timeouts": n_timeouts, "n_runs": n_runs,
     }
 
 
@@ -132,7 +156,9 @@ def in_plane_profile(energy, phi1, phi2, **kwargs):
 #                                       by pi about z, which sends phi -> phi + pi.
 
 def symmetry_orbit(i, j, n):
-    """The (up to 4) index pairs equivalent to (i, j)."""
+    """The (up to 4) index pairs equivalent to (i, j). Requires even n (phi + pi on the grid)."""
+    if n % 2:
+        raise ValueError("n_phi must be even (phi + pi must lie on the grid)")
     h = n // 2
     flip = ((i + h) % n, (j + h) % n)
     return {(i, j), flip, (j, i), (flip[1], flip[0])}
@@ -157,7 +183,8 @@ def sweep_point(energy, i, j, n_phi, settings):
     return {
         "i": i, "j": j, "n_phi": n_phi, "phi1": phi1, "phi2": phi2,
         "outer_edge": None if np.isnan(prof["outer_edge"]) else float(prof["outer_edge"]),
-        "capture_measure": prof["capture_measure"], "n_intervals": prof["n_intervals"],
+        "capture_measure": None if np.isnan(prof["capture_measure"]) else prof["capture_measure"],
+        "n_intervals": prof["n_intervals"], "unresolved": [list(u) for u in prof["unresolved"]],
         "edges": [float(e) for e in prof["edges"]], "edge_kinds": prof["edge_kinds"],
         "scan_codes": prof["scan_codes"], "contact_at_scan_top": prof["contact_at_scan_top"],
         "n_timeouts": prof["n_timeouts"], "n_runs": prof["n_runs"], "seconds": time.time() - t0,
@@ -186,14 +213,15 @@ def load_map(result_dir, expand_symmetry=True):
         if "error" in rec:
             errors.append(rec)
             continue
-        records[(rec["i"], rec["j"])] = rec
+        records[(rec["i"], rec["j"])] = rec   # a retried point's success supersedes its error
+    errors = [e for e in errors if (e["i"], e["j"]) not in records]
     for (i, j), rec in records.items():
         targets = symmetry_orbit(i, j, n) if expand_symmetry else {(i, j)}
         for a, b in targets:
             if (a, b) in records and (a, b) != (i, j):
                 continue          # computed directly: keep its own value
             outer[a, b] = np.nan if rec["outer_edge"] is None else rec["outer_edge"]
-            measure[a, b] = rec["capture_measure"]
+            measure[a, b] = np.nan if rec["capture_measure"] is None else rec["capture_measure"]
             n_intervals[a, b] = rec["n_intervals"]
             timeouts[a, b] = rec["n_timeouts"]
         computed[i, j] = True

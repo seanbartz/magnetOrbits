@@ -52,6 +52,25 @@ def git_state():
     return head, dirty
 
 
+def check_resume(meta_file, settings, n_phi, fundamental):
+    """Refuse to resume a run whose settings, grid or run mode (full/fundamental) differ."""
+    old = json.loads(meta_file.read_text())
+    if old["settings"] != settings or old["n_phi"] != n_phi or old["fundamental"] != fundamental:
+        raise SystemExit(f"{meta_file} has different settings or run mode; use a new --name")
+    return old
+
+
+def completed_points(points_file):
+    """(i, j) of points already computed successfully; failed points are retried on resume."""
+    done = set()
+    if points_file.exists():
+        for line in points_file.read_text().splitlines():
+            rec = json.loads(line)
+            if "error" not in rec:
+                done.add((rec["i"], rec["j"]))
+    return done
+
+
 def parse_args():
     p = argparse.ArgumentParser(description="Orientation map of capture profiles")
     p.add_argument("--name", required=True, help="results/<name>/")
@@ -79,8 +98,11 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     points_file = out_dir / "points.jsonl"
 
-    # 1. The grid: index pairs (i, j) -> phi = 2 pi i / n.
+    # 1. The grid: index pairs (i, j) -> phi = 2 pi i / n. Odd n breaks the symmetry group
+    #    (phi + pi must be a grid point), which map_checks and load_map rely on.
     n = args.n_phi
+    if n % 2:
+        raise SystemExit("--n-phi must be even (phi + pi must lie on the grid)")
     pairs = fundamental_domain(n) if args.fundamental else [(i, j) for i in range(n) for j in range(n)]
     settings = dict(energy=args.energy, b_min=args.b_min, b_max=args.b_max, n_scan=args.n_scan,
                     rel_tol=args.rel_tol, start_radius=args.start_radius, method=args.method)
@@ -93,20 +115,14 @@ def main():
                 started=time.strftime("%Y-%m-%d %H:%M:%S"), host=platform.node())
     meta_file = out_dir / "meta.json"
     if meta_file.exists():
-        old = json.loads(meta_file.read_text())
-        if old["settings"] != settings or old["n_phi"] != n:
-            raise SystemExit(f"{meta_file} has different settings; use a new --name")
+        old = check_resume(meta_file, settings, n, args.fundamental)
         if old["git_hash"] != head:
             print(f"warning: resuming a run started at {old['git_hash'][:8]} with code at {head[:8]}")
     else:
         meta_file.write_text(json.dumps(meta, indent=2))
 
-    # 3. Resume: skip points already in points.jsonl.
-    done = set()
-    if points_file.exists():
-        for line in points_file.read_text().splitlines():
-            rec = json.loads(line)
-            done.add((rec["i"], rec["j"]))
+    # 3. Resume: skip points already computed successfully (failed points are retried).
+    done = completed_points(points_file)
     pending = [(i, j) for i, j in pairs if (i, j) not in done]
     if args.limit:
         pending = pending[:args.limit]
