@@ -38,10 +38,11 @@ EDGE_THRESHOLD = 3e-6
 
 
 def recompute(args):
-    energy, phi1, phi2, settings = args
+    energy, phi1, phi2, settings, method = args
     return in_plane_profile(energy, phi1, phi2, b_min=settings["b_min"], b_max=settings["b_max"],
                             n_scan=2 * settings["n_scan"], rel_tol=settings["rel_tol"],
-                            start_radius=2 * settings.get("start_radius", 1000.0), **TIGHT_TOLERANCES)
+                            start_radius=2 * settings.get("start_radius", 1000.0), method=method,
+                            **TIGHT_TOLERANCES)
 
 
 def main():
@@ -50,6 +51,9 @@ def main():
     p.add_argument("--n-random", type=int, default=10)
     p.add_argument("--seed", type=int, default=20260924)
     p.add_argument("--workers", type=int, default=min(18, os.cpu_count() or 1))
+    p.add_argument("--reference", action="store_true",
+                   help="recompute with the scipy reference integrator instead of the run's own method "
+                        "(an independent check; ~400x slower)")
     args = p.parse_args()
 
     data = load_map(args.result_dir, expand_symmetry=False)
@@ -69,7 +73,9 @@ def main():
     print(f"recomputing {len(sample)} points ({len(multi)} multi-interval) with {TIGHT_TOLERANCES}, "
           f"r0 {2 * settings.get('start_radius', 1000.0):g}, n_scan {2 * settings['n_scan']} (seed {args.seed})")
 
-    jobs = [(settings["energy"], data["records"][r]["phi1"], data["records"][r]["phi2"], settings) for r in sample]
+    method = "reference" if args.reference else settings.get("method", "reference")
+    jobs = [(settings["energy"], data["records"][r]["phi1"], data["records"][r]["phi2"], settings, method)
+            for r in sample]
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         tight = list(pool.map(recompute, jobs))
 
