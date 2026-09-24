@@ -94,3 +94,18 @@ def test_sweep_point_is_in_plane_profile():
     direct = in_plane_profile(ENERGY_TILDE, 2 * np.pi / n, 2 * np.pi * 6 / n, **SETTINGS)
     assert rec["edges"] == [float(e) for e in direct["edges"]]
     assert rec["scan_codes"] == direct["scan_codes"]
+
+
+@pytest.mark.slow
+def test_regression_against_production_map():
+    """Recompute two points of the stored 32 x 32 production map (tests/reference/map_torus32.npz):
+    one two-interval point on the phi1 + phi2 = 15 pi/16 diagonal and one near head-to-tail."""
+    from pathlib import Path
+    ref = np.load(Path(__file__).parent / "reference" / "map_torus32.npz")
+    settings = json.loads(str(ref["settings"]))
+    n = len(ref["phi"])
+    for i, j in [(0, 15), (1, 1)]:
+        rec = sweep_point(settings["energy"], i, j, n, settings)
+        assert rec["n_intervals"] == ref["n_intervals"][i, j]
+        assert rec["outer_edge"] == pytest.approx(ref["outer_edge"][i, j], rel=1e-9)
+        assert rec["capture_measure"] == pytest.approx(ref["capture_measure"][i, j], rel=1e-9)
