@@ -13,9 +13,7 @@ of a sphere means only the moment direction matters).
 Scales: length $R$, energy $U_0=\mu_0\mu^2/4\pi R^3$, mass $m/2$ (reduced mass),
 time $t_0=\sqrt{(m/2)R^2/U_0}$. Dimensionless Hamiltonian
 
-$$H=\tfrac12|\mathbf p|^2+\frac{|\mathbf s_1|^2+|\mathbf s_2|^2}{2\tilde I}
--\frac{1}{r^3}\Big[3(\hat\mu_1\!\cdot\!\hat r)(\hat\mu_2\!\cdot\!\hat r)-\hat\mu_1\!\cdot\!\hat\mu_2\Big],
-\qquad \tilde I=2\beta=\tfrac45,\quad r_{\rm contact}=2 .$$
+$H=\tfrac12\lvert\mathbf p\rvert^2+\frac{\lvert\mathbf s_1\rvert^2+\lvert\mathbf s_2\rvert^2}{2\tilde I}-\frac{1}{r^3}\Big[3(\hat\mu_1\cdot\hat r)(\hat\mu_2\cdot\hat r)-\hat\mu_1\cdot\hat\mu_2\Big]$, with $\tilde I=2\beta=\tfrac45$ and $r_{\rm contact}=2$.
 
 Independent parameters: $\tilde E$ (relative KE $/U_0$), $\tilde b=b/R$, four orientation
 angles; initial spins zero. For uniformly magnetized spheres
@@ -23,9 +21,9 @@ $\tilde E=\tfrac34\rho v_{\rm rel}^2/\mu_0M^2$ — the sphere size drops out.
 
 Central-force baseline, $U=-\kappa/r^3$ ($\kappa=1$: $+z/-z$; $\kappa=2$: locked head-to-tail):
 
-$$\tilde b_c=\begin{cases}(27\kappa^2/4)^{1/6}\tilde E^{-1/3}, & \tilde E<\kappa/16\\
-\sqrt{4+\kappa/2\tilde E}, & \tilde E>\kappa/16\end{cases}
-\qquad \chi\to\frac{2\kappa}{\tilde E\tilde b^3}\ (\tilde b\to\infty).$$
+- $\tilde b_c=(27\kappa^2/4)^{1/6}\tilde E^{-1/3}$ for $\tilde E<\kappa/16$ (barrier-limited)
+- $\tilde b_c=\sqrt{4+\kappa/2\tilde E}$ for $\tilde E>\kappa/16$ (contact-limited)
+- $\chi\to 2\kappa/(\tilde E\tilde b^3)$ as $\tilde b\to\infty$
 
 Rigorous escape criterion: $\dot r>0$ and $\tfrac12\dot r^2>2/r^3$ (radial dipole force is
 bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps).
