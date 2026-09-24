@@ -183,10 +183,11 @@ def fundamental_domain(n):
 # Coordinates: s runs ALONG the line, d measures the offset ACROSS it (both in radians).
 #   antiparallel:  phi1 = s,  phi2 = s + pi + d     (d = 0: m2 = -m1, an invariant family)
 #   mirror:        phi1 = s,  phi2 = pi - s + d     (d = 0: m2 = m1 reflected across the y axis)
+#   box:           phi1 = s,  phi2 = d              (a plain 2D patch of the torus)
 # Grid specs are given in units of pi so that grid points can coincide exactly (to rounding)
 # with the 32 x 32 torus map (steps pi/16): `along` is periodic (endpoint excluded), `across`
 # includes both ends.
-STRIP_LINES = ("antiparallel", "mirror")
+STRIP_LINES = ("antiparallel", "mirror", "box")
 
 
 def strip_angles(line, s, d):
@@ -195,6 +196,8 @@ def strip_angles(line, s, d):
         return s, s + np.pi + d
     if line == "mirror":
         return s, np.pi - s + d
+    if line == "box":
+        return s, d
     raise ValueError(f"unknown strip line {line!r}; expected one of {STRIP_LINES}")
 
 

@@ -8,9 +8,12 @@ For each strip: the outer collision edge b_out(s, d) and the number of contact i
 images (horizontal: offset d across the line; vertical: position s along it), and b_out(d)
 profiles at a few s. Written to figures/<name>_edge.pdf, <name>_intervals.pdf, <name>_profiles.pdf.
 
-What is and is not converged (stage 8 finding): b_out agrees with a 4x finer b scan to < 1e-6,
-so the b_out panels are results. Interval counts are only lower bounds near the mirror trough,
-where thin escape windows (and, at finer scan, sub-windows) appear below the scan resolution.
+What is and is not converged (stage 8 findings): b_out agrees with a 4x finer b scan to < 1e-6 on
+both strips and the tail-to-tail patch, so those b_out panels are results. Interval counts are only
+lower bounds in the escape-window band, where thin windows (and sub-windows) sit below the scan
+resolution; the boundary there is fractal (analysis/uncertainty.py). In the fine patch at the band
+edge / antiparallel crossing, 0.7% of points also gain a thin contact sliver above b_out under the
+finer scan, so b_out is a lower bound there too.
 """
 
 import sys
@@ -23,7 +26,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from physics import central          # noqa: E402
 from physics.edges import load_map  # noqa: E402
 
-AXIS_LABEL = {"antiparallel": r"$d/\pi$  ($\phi_2=\phi_1+\pi+d$)", "mirror": r"$d/\pi$  ($\phi_2=\pi-\phi_1+d$)"}
+AXIS_LABEL = {"antiparallel": r"$d/\pi$  ($\phi_2=\phi_1+\pi+d$)", "mirror": r"$d/\pi$  ($\phi_2=\pi-\phi_1+d$)",
+              "box": r"$\phi_2/\pi$"}
+ALONG_LABEL = {"antiparallel": r"$s/\pi$  ($\phi_1=s$)", "mirror": r"$s/\pi$  ($\phi_1=s$)", "box": r"$\phi_1/\pi$"}
 
 
 def figures(result_dir):
@@ -44,8 +49,9 @@ def figures(result_dir):
         fig, ax = plt.subplots(figsize=(8, 6))
         im = ax.imshow(data[key], origin="lower", extent=extent, aspect="auto", cmap=cmap, interpolation="nearest")
         fig.colorbar(im, ax=ax, label=label)
-        ax.axvline(0, color="w", lw=0.8, ls="--")
-        ax.set_xlabel(AXIS_LABEL[line]); ax.set_ylabel(r"$s/\pi$  ($\phi_1=s$)")
+        if line != "box":                                  # d = 0 is the line itself for strips
+            ax.axvline(0, color="w", lw=0.8, ls="--")
+        ax.set_xlabel(AXIS_LABEL[line]); ax.set_ylabel(ALONG_LABEL[line])
         fig.tight_layout()
         path = out_dir / f"{name}_{'edge' if key == 'outer_edge' else 'intervals'}.pdf"
         fig.savefig(path); fig.savefig(path.with_suffix(".png"), dpi=110); plt.close(fig)
