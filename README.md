@@ -22,7 +22,8 @@ $$\ddot{\mathbf r}=\mathbf F_2,\qquad \dot{\hat\mu}_i=\boldsymbol\omega_i\times\
 $$U=-\frac{1}{r^3}\Big[3(\hat\mu_1\!\cdot\!\hat r)(\hat\mu_2\!\cdot\!\hat r)-\hat\mu_1\!\cdot\!\hat\mu_2\Big].$$
 
 The inputs are $\tilde E$ (relative kinetic energy $/U_0$), $\tilde b=b/R$, and the initial
-moment directions. For uniformly magnetized spheres,
+moment directions, defined at $t\to-\infty$ for a non-spinning in-state (the torque acting
+on the incoming leg outside $r_0$ is added to first order). For uniformly magnetized spheres,
 $\tilde E=\tfrac34\rho v_{\rm rel}^2/\mu_0M^2$, independent of the sphere size.
 Physical units appear only in `physics/model.py` (`scales`, `physical_to_dimensionless`).
 

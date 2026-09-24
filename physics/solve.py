@@ -25,12 +25,14 @@ In-state
 Relative particle at distance r0 on the line y = b0, z = 0, moving along +x:
 r = (-sqrt(r0^2 - b0^2), b0, 0), v = (v0, 0, 0), with v0^2/2 + U(r0) = E and
 b0 v0 = b sqrt(2E), so the translational energy and orbital angular momentum at infinity
-are exactly E and b sqrt(2E). Moments m1, m2 and spins w1, w2 are given at r0 in the lab
-frame. Remaining finite-r0 effects, checked for convergence:
+are exactly E and b sqrt(2E). Moments m1, m2 are lab-frame directions at t -> -inf
+(non-spinning in-state): the torque, generically ~ 1/r^3, has already turned them by
+O(1/(I E r0)) and spun them up by O(1/(I v r0^2)) before r0, and the first-order values of
+both are added (incoming_leg_correction; switch off with asymptotic_correction=False, in
+which case m and w refer to r0). Remaining finite-r0 effects, checked for convergence:
   * the velocity direction at r0 ignores the bending accumulated on (-inf, r0), O(b/E r0^4);
-  * for a non-spinning in-state the torque ~ 1/r^3 has already turned the moments by
-    O(1 / (I E r0)) when coming from infinity; irrelevant when torques vanish (+z/-z),
-    handled in a later stage otherwise.
+  * second-order orientation terms and the O(I w) orbital angular momentum handed to the
+    spins on the incoming leg, both O(r0^-2).
 
 Numerical method
 ----------------
@@ -61,7 +63,7 @@ run_trajectory(energy, impact_parameter, m1, m2, ...) -> dict (see its docstring
 """
 
 import numpy as np
-from scipy.integrate import solve_ivp
+from scipy.integrate import quad_vec, solve_ivp
 
 from physics import observables
 from physics.model import (CONTACT_SEPARATION, MIN_RADIAL_FORCE_COEFF, SphereParams,
@@ -72,25 +74,86 @@ from physics.model import (CONTACT_SEPARATION, MIN_RADIAL_FORCE_COEFF, SpherePar
 ESCAPE_COEFF = -MIN_RADIAL_FORCE_COEFF / 3.0
 
 
-def initial_state(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0), start_radius=1000.0):
+def rotate_vector(vec, rotation_vector):
+    """Rodrigues rotation of vec by the rotation vector theta (axis theta/|theta|, angle |theta|)."""
+    angle = np.linalg.norm(rotation_vector)
+    if angle == 0.0:
+        return vec.copy()
+    axis = rotation_vector / angle
+    return (vec * np.cos(angle) + np.cross(axis, vec) * np.sin(angle)
+            + axis * (axis @ vec) * (1.0 - np.cos(angle)))
+
+
+def incoming_leg_correction(energy, impact_parameter, x_start, m1, m2, inertia_tilde):
+    """First-order effect of the torques on the incoming leg (-inf, x_start].
+
+    Along the unperturbed straight line r(x) = (x, b, 0), x = x_start - s, speed v = sqrt(2E),
+    with the moments frozen at their asymptotic directions m_i:
+
+        w_i(x_start)     = 1/(I v)   Int_0^inf tau_i(x_start - s) ds
+        theta_i(x_start) = 1/(I v^2) Int_0^inf s tau_i(x_start - s) ds     (rotation vector)
+
+    Returns (theta1, theta2, w1, w2). Generic torques fall off as 1/r^3, so theta = O(1/(I E r0))
+    and w = O(1/(I v r0^2)); neglected terms are O(r0^-2) in theta.
+    """
+    speed = np.sqrt(2.0 * energy)
+
+    def integrand(s):
+        position = np.array([x_start - s, impact_parameter, 0.0])
+        tau1, tau2 = torques(position, m1, m2)
+        return np.concatenate([tau1, tau2, s * tau1, s * tau2])
+
+    moments, _ = quad_vec(integrand, 0.0, np.inf, epsabs=1e-20, epsrel=1e-11)
+    w1 = moments[0:3] / (inertia_tilde * speed)
+    w2 = moments[3:6] / (inertia_tilde * speed)
+    theta1 = moments[6:9] / (inertia_tilde * speed**2)
+    theta2 = moments[9:12] / (inertia_tilde * speed**2)
+    return theta1, theta2, w1, w2
+
+
+def initial_state(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0), start_radius=1000.0,
+                  inertia_tilde=SphereParams().inertia_tilde, asymptotic_correction=True):
     """19-component in-state (see module docstring). Moments are normalized here.
 
-    The speed v0 at r0 is chosen so that v0^2/2 + U(r0) = E exactly (the asymptotic
-    translational energy), and the lateral offset b0 = b v_inf / v0 so that the orbital
-    angular momentum equals b sqrt(2E) exactly. Without this, H(r0) = E + U(r0) and the
+    The speed v0 at r0 is chosen so that v0^2/2 + U(r0) + K_rot(r0) = E exactly (the
+    asymptotic translational energy), and the lateral offset b0 = b v_inf / v0 so that the
+    orbital angular momentum equals b sqrt(2E) exactly. Without this, H(r0) = E + U(r0) and the
     deflection carries an O(1/r0^3) error (measured: 3e-8 at E = 0.03, b = 5, r0 = 1000).
+
+    asymptotic_correction=True (default): m1, m2 are the directions at t -> -inf of a
+    NON-spinning in-state, and the state at r0 includes the first-order rotation and spin
+    picked up on the way in (incoming_leg_correction). Without it the moments are the
+    directions at r0, which differ from the asymptotic ones by O(1/(I E r0)).
+    A spinning in-state has no asymptotic orientation (the phase keeps advancing), so the
+    correction requires w1 = w2 = 0.
     """
     if impact_parameter >= start_radius:
         raise ValueError("impact parameter must be smaller than the start radius")
     m1 = np.asarray(m1, dtype=float) / np.linalg.norm(m1)
     m2 = np.asarray(m2, dtype=float) / np.linalg.norm(m2)
+    w1 = np.asarray(w1, dtype=float)
+    w2 = np.asarray(w2, dtype=float)
     speed_at_infinity = np.sqrt(2.0 * energy)
+
+    if asymptotic_correction:
+        if np.any(w1) or np.any(w2):
+            raise ValueError("asymptotic orientation is undefined for a spinning in-state; "
+                             "pass asymptotic_correction=False (moments then refer to r0)")
+        x_start = -np.sqrt(start_radius**2 - impact_parameter**2)
+        theta1, theta2, w1, w2 = incoming_leg_correction(
+            energy, impact_parameter, x_start, m1, m2, inertia_tilde)
+        m1, m2 = rotate_vector(m1, theta1), rotate_vector(m2, theta2)
+        # Spin energy picked up on the way in came out of the orbital energy.
+        acquired_rotational_energy = 0.5 * inertia_tilde * (w1 @ w1 + w2 @ w2)
+    else:
+        # Spin supplied by the caller is intrinsic to the in-state: E stays translational.
+        acquired_rotational_energy = 0.0
 
     # Fixed-point iteration: U(r0) depends (weakly, via the offset) on b0, which depends on v0.
     offset = impact_parameter
     for _ in range(3):
         position = np.array([-np.sqrt(start_radius**2 - offset**2), offset, 0.0])
-        speed = np.sqrt(2.0 * (energy - potential(position, m1, m2)))
+        speed = np.sqrt(2.0 * (energy - potential(position, m1, m2) - acquired_rotational_energy))
         offset = impact_parameter * speed_at_infinity / speed
 
     y0 = np.zeros(observables.STATE_SIZE)
@@ -184,14 +247,15 @@ def integrate_state(y0, max_time, params=SphereParams(), rtol=1e-10, atol=1e-12,
 def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
                    params=SphereParams(), start_radius=1000.0, outgoing_radius=None,
                    stop="r_out", rtol=1e-10, atol=1e-12, max_time=None,
-                   keep_solution=False):
+                   asymptotic_correction=True, keep_solution=False):
     """Integrate one trajectory and summarize it.
 
     Parameters
     ----------
     energy, impact_parameter : E_tilde, b_tilde of the in-state.
-    m1, m2 : initial moment directions (3,), lab frame; normalized internally.
-    w1, w2 : initial spin angular velocities (3,).
+    m1, m2 : initial moment directions (3,), lab frame; normalized internally. With
+        asymptotic_correction (default) they are the directions at t -> -inf; otherwise at r0.
+    w1, w2 : initial spin angular velocities (3,); nonzero requires asymptotic_correction=False.
     params : SphereParams (inertia factor beta).
     start_radius : r0 of the in-state.
     outgoing_radius : r_out where an escaping run stops (default = start_radius).
@@ -211,7 +275,8 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
         n_rhs, escape_time, params/settings echo
     """
     inertia = params.inertia_tilde
-    y0 = initial_state(energy, impact_parameter, m1, m2, w1, w2, start_radius)
+    y0 = initial_state(energy, impact_parameter, m1, m2, w1, w2, start_radius,
+                       inertia_tilde=inertia, asymptotic_correction=asymptotic_correction)
     speed = np.sqrt(2.0 * energy)
     if max_time is None:
         max_time = 4.0 * start_radius / speed + 2000.0
@@ -268,7 +333,8 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
         "n_rhs": sol.nfev,
         "settings": dict(energy=energy, impact_parameter=impact_parameter, start_radius=start_radius,
                          outgoing_radius=outgoing_radius, stop=stop, rtol=rtol, atol=atol,
-                         max_time=max_time, inertia_factor=params.inertia_factor),
+                         max_time=max_time, inertia_factor=params.inertia_factor,
+                         asymptotic_correction=asymptotic_correction),
     }
     if keep_solution:
         result["solution"] = sol

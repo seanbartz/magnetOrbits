@@ -172,7 +172,9 @@ def test_global_moment_flip_symmetry():
 # --- regression ---------------------------------------------------------------------------
 
 def compute_generic_reference():
-    rows = [run_trajectory(e, b, m1, m2) for e, b, m1, m2 in generic_cases()]
+    # Stage-4 reference predates the asymptotic in-state correction (stage 5): it is the
+    # back-compatibility check that the new code with the correction off reproduces it.
+    rows = [run_trajectory(e, b, m1, m2, asymptotic_correction=False) for e, b, m1, m2 in generic_cases()]
     return {
         "energy": np.array([c[0] for c in generic_cases()]),
         "impact_parameter": np.array([c[1] for c in generic_cases()]),
@@ -203,5 +205,5 @@ if __name__ == "__main__":
     dirty = bool(subprocess.run(["git", "status", "--porcelain", "physics"],
                                 capture_output=True, text=True).stdout)
     np.savez(REFERENCE, **data, git_hash=git_hash, git_dirty=dirty,
-             settings="run_trajectory defaults: r0=1000, rtol=1e-10, atol=1e-12, beta=0.4")
+             settings="run_trajectory defaults (r0=1000, rtol=1e-10, atol=1e-12, beta=0.4), asymptotic_correction=False")
     print(f"wrote {REFERENCE} (git {git_hash[:8]}, dirty={dirty})")

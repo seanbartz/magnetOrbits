@@ -48,7 +48,7 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   *Check:* head-to-tail small-oscillation frequencies $\omega^2=3/\tilde Ir^3,\,1/\tilde Ir^3$;
   $+z/-z$ scissor-instability growth rate; $E$ and $\mathbf J=\mathbf L+\mathbf S_1+\mathbf S_2$
   conserved in generic 3D runs while $\mathbf L$ alone is not.
-- [ ] **5. Paper comparison** (Bartz & Shaw, arXiv:2212.00876): moments along the incoming
+- [x] **5. Paper comparison** (Bartz & Shaw, arXiv:2212.00876): moments along the incoming
   $\hat r$, $\tilde E=3\tilde R^3v_i^2\approx0.0335$.
   *Check:* their max colliding $b/R=4.65$ (Fig. 4 caption) vs our value and the locked
   value 5.37. Expected discrepancy (their 4.65 is likely the sticking edge, not the touching
@@ -70,6 +70,16 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   pair near the barrier-limited edge, the orbiting phase amplifies any tilt enormously.
 - Contact-limited branch is $\sqrt{4+\kappa/2\tilde E}$ (an early code version had
   $\sqrt{4+\kappa/\tilde E}$; caught by a test precondition).
+
+- **In-state orientation is now defined at $t\to-\infty$** (stage 5): first-order incoming-leg
+  correction raises $r_0$-convergence from order 1 to 2 (generic) and 2 to 3 (head-to-tail);
+  residual at $r_0=1000$ is $\sim10^{-7}$ (was $10^{-3}$–$10^{-2}$).
+- **Paper discrepancy** (stage 5, open). Head-to-tail at $\tilde E=0.033501$: our collision
+  edge $b_c=5.75459$ (converged to $2\times10^{-8}$; single interval; $1.071\times$ the locked
+  value 5.3729) vs. the paper's $4.65$. Ruled out: $r_0$, rtol, alignment with $\hat r$ at a
+  finite start ($\ge5.66$ even at $8R$), and sticking vs. touching (first-bounce sticking
+  estimate with $\Gamma=0.05$: $5.54$). $\tilde E$ larger by $2.07\times$ would give $4.65$
+  — suggestive of a factor-2 convention difference; needs the original GlowScript code.
 
 ## Cost outlook
 
