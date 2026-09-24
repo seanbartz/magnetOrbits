@@ -9,7 +9,8 @@ Checks (full-torus runs only, where every point is computed directly)
 Every point is compared with its symmetry partners
     F: (phi1 + pi, phi2 + pi)  global flip,      S: (phi2, phi1)  exchange + flip
 (physics/edges.py). Partners must have the same interval count and the same edges to the
-bisection tolerance (rel 2e-6, i.e. twice rel_tol). CAVEAT: both symmetries hold in floating
+bisection tolerance (rel 2e-6, i.e. twice rel_tol), the same edge kinds ("ce"/"ec"),
+the same scan-top contact state, and no unresolved (timeout) ranges. CAVEAT: both symmetries hold in floating
 point, not only in exact arithmetic (the flip only changes signs; F and tau are term-by-term
 symmetric under relabeling m1 <-> m2), so this checks the implementation's symmetry and the
 bookkeeping, NOT numerical accuracy. Accuracy is checked by analysis/map_convergence.py.
@@ -43,7 +44,9 @@ def symmetry_check(data):
                 continue
             other = records[(a, b)]
             compared += 1
-            if other["n_intervals"] != rec["n_intervals"] or len(other["edges"]) != len(rec["edges"]):
+            structure = ("n_intervals", "edge_kinds", "contact_at_scan_top")
+            if (any(other[k] != rec[k] for k in structure) or len(other["edges"]) != len(rec["edges"])
+                    or other.get("unresolved") or rec.get("unresolved")):
                 structure_mismatch.append(((i, j), (a, b)))
                 continue
             if rec["edges"]:
@@ -108,6 +111,9 @@ def main():
               f"(tol {EDGE_RTOL:.0e}), structure mismatches {len(mismatches)}  -> {status}")
         for pair in mismatches[:10]:
             print("   mismatch", pair)
+        if status == "FAIL":
+            make_figures(data, result_dir.name)
+            raise SystemExit(1)
 
     outer = data["outer_edge"]
     nint = data["n_intervals"]

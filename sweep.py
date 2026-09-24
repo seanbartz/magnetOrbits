@@ -44,10 +44,15 @@ from physics.edges import fundamental_domain, sweep_point
 from tests.published.bartz_shaw_2022 import ENERGY_TILDE as PAPER_ENERGY
 
 
+# Everything a sweep imports at run time: physics/, this script, and tests/published (the
+# default energy). A change in any of them marks the run dirty.
+RUNTIME_PATHS = ("physics", "sweep.py", "tests/published")
+
+
 def git_state():
     root = Path(__file__).parent
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True).stdout.strip()
-    dirty = bool(subprocess.run(["git", "status", "--porcelain", "physics", "sweep.py"], cwd=root,
+    dirty = bool(subprocess.run(["git", "status", "--porcelain", *RUNTIME_PATHS], cwd=root,
                                 capture_output=True, text=True).stdout)
     return head, dirty
 

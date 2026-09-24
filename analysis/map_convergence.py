@@ -18,7 +18,8 @@ The sample is every multi-interval point in the fundamental domain plus random o
 
 import os
 
-for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+             "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS"):
     os.environ.setdefault(_var, "1")
 
 import argparse
@@ -82,6 +83,8 @@ def main():
     status = "PASS" if not failures else f"FAIL at {failures}"
     print(f"structure identical at {len(sample) - len(failures)}/{len(sample)}; max rel edge diff {worst:.1e} "
           f"(threshold {EDGE_THRESHOLD:.0e})  -> {status}")
+    if failures:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

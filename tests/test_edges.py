@@ -15,6 +15,7 @@ The full-torus symmetry check on the 32 x 32 production map is in analysis/map_c
 """
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -163,3 +164,24 @@ def test_resume_retries_failed_points_and_checks_run_mode(tmp_path):
     for args in [({"energy": 0.2}, 8, False), ({"energy": 0.1}, 16, False), ({"energy": 0.1}, 8, True)]:
         with pytest.raises(SystemExit):
             sweep.check_resume(meta, *args)
+
+
+def test_symmetry_check_compares_edge_kinds():
+    """analysis/map_checks.symmetry_check: same edge positions but opposite kinds is a mismatch."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "analysis"))
+    from map_checks import symmetry_check
+    n = 4
+    base = {"n_intervals": 1, "edges": [3.0], "contact_at_scan_top": False, "unresolved": []}
+    records = {}
+    for i, j in {(0, 1), (1, 0), (2, 3), (3, 2)}:           # one symmetry orbit for n = 4
+        records[(i, j)] = {**base, "edge_kinds": ["ce"]}
+    data = {"records": records, "meta": {"n_phi": n}}
+    assert symmetry_check(data)[1] == []
+    records[(1, 0)] = {**base, "edge_kinds": ["ec"]}
+    assert symmetry_check(data)[1]
+
+
+def test_dirty_check_covers_runtime_inputs():
+    import sweep
+    assert {"physics", "sweep.py", "tests/published"} <= set(sweep.RUNTIME_PATHS)
