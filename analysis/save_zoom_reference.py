@@ -36,8 +36,9 @@ def main():
     loaded = {}
     for name in RUNS:
         data = load_map(ROOT / "results" / name)
-        if data["meta"]["git_dirty"]:
-            raise SystemExit(f"{name} was run from a dirty tree; rerun it from committed code first")
+        if data["meta"]["git_dirty"] or data["meta"].get("git_mixed", False):
+            raise SystemExit(f"{name} was run from a dirty tree or resumed with different code; "
+                             "rerun it from committed code first")
         problem = completeness_problem(data)
         if problem:
             raise SystemExit(f"{name} is incomplete ({problem}); resume or rerun the sweep before storing it")

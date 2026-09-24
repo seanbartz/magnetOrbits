@@ -183,10 +183,20 @@ def test_unresolved_profiles_fail_completeness(tmp_path):
     assert checks.returncode == 1 and "INCOMPLETE" in checks.stdout
 
 
-def test_strip_maps_handles_a_single_row(tmp_path, monkeypatch):
+def test_strip_maps_handles_a_single_row(tmp_path):
     sys.path.insert(0, str(ROOT / "analysis"))
     import strip_maps
     write_strip_run(tmp_path / "one_row", 1, [-0.1, 0.1, 3], good_record)
-    monkeypatch.setattr(strip_maps.Path, "resolve", lambda self: tmp_path / "analysis" / "x.py")   # figures -> tmp
-    written = strip_maps.figures(tmp_path / "one_row")
-    assert all(p.exists() for p in written)
+    written = strip_maps.figures(tmp_path / "one_row", out_dir=tmp_path / "figures")
+    assert written and all(p.exists() and p.parent == tmp_path / "figures" for p in written)
+
+
+def test_resume_records_provenance(tmp_path):
+    import sweep
+    meta = tmp_path / "meta.json"
+    old = {"git_hash": "aaa", "git_dirty": False}
+    meta.write_text(json.dumps(old))
+    assert sweep.record_resume(meta, dict(old), "aaa", False, 0) == old          # nothing computed: unchanged
+    new = sweep.record_resume(meta, dict(old), "bbb", True, 5)
+    stored = json.loads(meta.read_text())
+    assert stored["git_mixed"] and stored["git_dirty"] and stored["resumes"][0]["points"] == 5 and new == stored

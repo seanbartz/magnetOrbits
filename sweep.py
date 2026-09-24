@@ -54,12 +54,30 @@ from tests.published.bartz_shaw_2022 import ENERGY_TILDE as PAPER_ENERGY
 RUNTIME_PATHS = ("physics", "sweep.py", "tests/published")
 
 
-def git_state():
+def git_state(extra_paths=()):
+    """(HEAD hash, dirty flag) over RUNTIME_PATHS plus any extra paths a caller also imports."""
     root = Path(__file__).parent
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True).stdout.strip()
-    dirty = bool(subprocess.run(["git", "status", "--porcelain", *RUNTIME_PATHS], cwd=root,
+    dirty = bool(subprocess.run(["git", "status", "--porcelain", *RUNTIME_PATHS, *extra_paths], cwd=root,
                                 capture_output=True, text=True).stdout)
     return head, dirty
+
+
+def record_resume(meta_file, old, head, dirty, n_pending):
+    """Add this resume's provenance to meta.json before it computes new points.
+
+    Points computed now come from the code at `head`; if that differs from the run's original
+    hash the run is marked git_mixed, and a dirty tree makes the whole run git_dirty. Downstream
+    checks (save_zoom_reference) refuse mixed or dirty runs.
+    """
+    if n_pending == 0:
+        return old
+    old.setdefault("resumes", []).append({"git_hash": head, "git_dirty": dirty, "points": n_pending,
+                                          "at": time.strftime("%Y-%m-%d %H:%M:%S")})
+    old["git_dirty"] = bool(old["git_dirty"] or dirty)
+    old["git_mixed"] = bool(old.get("git_mixed", False) or head != old["git_hash"])
+    meta_file.write_text(json.dumps(old, indent=2))
+    return old
 
 
 def check_resume(meta_file, settings, n_phi, fundamental, grid=None):
@@ -146,11 +164,8 @@ def main():
                 "beta=0.4, asymptotic_correction=True, stop='escape'",
                 started=time.strftime("%Y-%m-%d %H:%M:%S"), host=platform.node())
     meta_file = out_dir / "meta.json"
-    if meta_file.exists():
-        old = check_resume(meta_file, settings, n, args.fundamental, grid)
-        if old["git_hash"] != head:
-            print(f"warning: resuming a run started at {old['git_hash'][:8]} with code at {head[:8]}")
-    else:
+    old = check_resume(meta_file, settings, n, args.fundamental, grid) if meta_file.exists() else None
+    if old is None:
         meta_file.write_text(json.dumps(meta, indent=2))
 
     # 3. Resume: skip points already computed successfully (failed points are retried).
@@ -158,6 +173,11 @@ def main():
     pending = [(i, j) for i, j in pairs if (i, j) not in done]
     if args.limit is not None:           # --limit 0 means "run nothing" (e.g. just write meta.json)
         pending = pending[:args.limit]
+    if old is not None:
+        if old["git_hash"] != head and pending:
+            print(f"warning: resuming a run started at {old['git_hash'][:8]} with code at {head[:8]}; "
+                  "meta.json records it as git_mixed")
+        record_resume(meta_file, old, head, dirty, len(pending))
     print(f"{len(pairs)} points, {len(done)} done, running {len(pending)} on {args.workers} workers "
           f"(git {head[:8]}{', DIRTY' if dirty else ''})")
 

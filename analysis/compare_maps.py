@@ -77,7 +77,9 @@ def main():
     if ref_is_dir:
         ref = load_map(paths[1])
         require_complete(ref, paths[1])
-        assert new["grid"] == ref["grid"], f"different grids: {new['grid']} vs {ref['grid']}"
+        if new["grid"] != ref["grid"]:
+            print(f"different grids: {new['grid']} vs {ref['grid']}  -> FAIL")
+            raise SystemExit(1)
         ref_settings = ref["meta"]["settings"]
     else:
         ref = np.load(paths[1])
@@ -86,7 +88,9 @@ def main():
     # the whole-map test of the one-transition-per-scan-cell assumption (physics/edges.py).
     ignore = {"method", "n_scan"} if "--scan-refinement" in sys.argv else {"method"}
     new_settings = {k: v for k, v in new["meta"]["settings"].items() if k not in ignore}
-    assert new_settings == {k: v for k, v in ref_settings.items() if k not in ignore}, "different map settings"
+    if new_settings != {k: v for k, v in ref_settings.items() if k not in ignore}:
+        print(f"different map settings: {new_settings} vs {ref_settings}  -> FAIL")
+        raise SystemExit(1)
     same_intervals = np.array_equal(new["n_intervals"], ref["n_intervals"])
     rel_edge = max_rel_diff(new["outer_edge"], ref["outer_edge"])
     rel_measure = max_rel_diff(new["capture_measure"], ref["capture_measure"])

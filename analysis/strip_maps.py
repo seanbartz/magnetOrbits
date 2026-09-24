@@ -31,7 +31,7 @@ AXIS_LABEL = {"antiparallel": r"$d/\pi$  ($\phi_2=\phi_1+\pi+d$)", "mirror": r"$
 ALONG_LABEL = {"antiparallel": r"$s/\pi$  ($\phi_1=s$)", "mirror": r"$s/\pi$  ($\phi_1=s$)", "box": r"$\phi_1/\pi$"}
 
 
-def figures(result_dir):
+def figures(result_dir, out_dir=None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -46,7 +46,7 @@ def figures(result_dir):
     ds = (a_hi - a_lo) / n_along
     dd = (c_hi - c_lo) / (n_across - 1) if n_across > 1 else (c_hi - c_lo) or 1.0
     extent = (across[0] - dd / 2, across[-1] + dd / 2, along[0] - ds / 2, along[-1] + ds / 2)
-    out_dir = Path(__file__).resolve().parents[1] / "figures"
+    out_dir = Path(out_dir) if out_dir is not None else Path(__file__).resolve().parents[1] / "figures"
     out_dir.mkdir(exist_ok=True)
     written = []
     for key, label, cmap in [("outer_edge", r"$b_{\rm out}/R$", "viridis"), ("n_intervals", "contact intervals", "magma")]:

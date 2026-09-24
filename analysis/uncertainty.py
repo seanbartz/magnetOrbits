@@ -99,13 +99,9 @@ def scaling_job(args):
 
 
 def git_state():
-    """(HEAD hash, dirty flag) over everything this analysis imports: the sweep's runtime paths
-    (physics/, sweep.py, tests/published for the default energy) and this script."""
-    from sweep import RUNTIME_PATHS
-    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    dirty = bool(subprocess.run(["git", "status", "--porcelain", *RUNTIME_PATHS, "analysis/uncertainty.py"],
-                                cwd=ROOT, capture_output=True, text=True).stdout)
-    return head, dirty
+    """(HEAD hash, dirty flag) over the sweep's runtime paths plus this script (sweep.git_state)."""
+    import sweep
+    return sweep.git_state(extra_paths=("analysis/uncertainty.py",))
 
 
 def refit(summary):
@@ -156,18 +152,22 @@ def main():
         # 1. Uncertainty counts: every point's flat b list, split into chunks across workers.
         for name, (m1, m2, b_lo, b_hi, desc) in POINTS.items():
             t0 = time.time()
-            centers, eps, b_all = sample_points(b_lo, b_hi, EPSILONS, args.samples, args.seed)
+            # eps <= L/30: the fit range, and it keeps the centers (drawn from [b_lo + eps_max,
+            # b_hi - eps_max]) spread over >= 93% of the stated interval.
+            point_eps = [e for e in EPSILONS if e <= (b_hi - b_lo) / 30]
+            centers, eps, b_all = sample_points(b_lo, b_hi, point_eps, args.samples, args.seed)
             chunks = np.array_split(b_all, 4 * args.workers)
             codes = "".join(pool.map(chunk_job, [(ENERGY_TILDE, m1, m2, c) for c in chunks]))
             rows = uncertain_counts(codes, len(centers), eps)
             counts, totals = [r[0] for r in rows], [r[1] for r in rows]
             alpha, alpha_err, used = fit_exponent(eps, counts, totals, eps_max=(b_hi - b_lo) / 30)
             summary["points"][name] = {"description": desc, "b_lo": b_lo, "b_hi": b_hi,
+                                       "sampled_interval": [b_lo + eps[0], b_hi - eps[0]],
                                        "m1": list(map(float, m1)), "m2": list(map(float, m2)),
                                        "eps": eps.tolist(), "uncertain": counts, "totals": totals,
                                        "timeouts": [r[2] for r in rows], "alpha": alpha, "alpha_err": alpha_err,
                                        "fit_used": used.tolist()}
-            print(f"{name:13s} alpha = {alpha:.3f} +- {alpha_err:.3f}   f(eps) = "
+            print(f"{name:13s} centers in [{b_lo + eps[0]:.4f}, {b_hi - eps[0]:.4f}]  alpha = {alpha:.3f} +- {alpha_err:.3f}   f(eps) = "
                   f"{' '.join(f'{c / t:.1e}' for c, t in zip(counts, totals))}   [{time.time() - t0:.0f} s]", flush=True)
         # 2. Resolution scaling (band points and one control), one point per worker.
         jobs = [(n, ENERGY_TILDE, *POINTS[n][:4]) for n in POINTS if n != "control_zz"]
