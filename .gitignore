@@ -1,8 +1,10 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ipynb_checkpoints/
 *.egg-info/
 
-# derived scan data; regenerate with scans/*.py
-data/
+# regenerable sweep output; small validation references ARE committed
+results/
 *.npz
+!tests/reference/*.npz
