@@ -156,6 +156,9 @@ def test_compare_maps_nan_and_exit_status(tmp_path):
     a = np.array([[1.0, np.nan], [2.0, 3.0]])
     assert max_rel_diff(a, a) == 0.0
     assert max_rel_diff(a, np.array([[1.0, 5.0], [2.0, 3.0]])) == np.inf
+    zeros = np.array([[0.0, 1.0]])
+    assert max_rel_diff(zeros, zeros) == 0.0                       # 0 == 0 is not a failure
+    assert max_rel_diff(np.array([[1e-3, 1.0]]), zeros) == np.inf  # nonzero vs zero is
     # A deliberately different map must make the script exit with status 1.
     ref = np.load(REFERENCE / "map_torus32.npz")
     n = len(ref["phi"])

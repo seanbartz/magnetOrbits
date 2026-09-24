@@ -25,12 +25,22 @@ RTOL = 2e-6
 
 
 def max_rel_diff(a, b):
-    """Max relative difference; a cell that is nan in only one map counts as infinite."""
+    """Max relative difference |a - b| / |b| over cells present in both maps.
+
+    A cell that is nan in only one map, or zero in one and nonzero in the other, counts as
+    infinite; equal cells (including 0 == 0, e.g. a zero capture measure) count as zero.
+    """
     a, b = np.asarray(a, float), np.asarray(b, float)
     if a.shape != b.shape or not np.array_equal(np.isnan(a), np.isnan(b)):
         return np.inf
     both = ~np.isnan(a)
-    return float(np.max(np.abs(a[both] - b[both]) / np.abs(b[both]))) if both.any() else 0.0
+    a, b = a[both], b[both]
+    if a.size == 0:
+        return 0.0
+    diff = np.abs(a - b)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rel = np.where(diff == 0.0, 0.0, diff / np.abs(b))   # b == 0 != a  ->  inf
+    return float(np.max(rel))
 
 
 def main():
