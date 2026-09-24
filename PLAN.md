@@ -41,7 +41,7 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   *Check:* orientations exactly fixed; $\chi(b)$ vs independent quadrature of the $-1/r^3$
   orbit integral; large-$b$ limit $2/\tilde E\tilde b^3$; drift of $E$, $\mathbf J$, $|\hat\mu|$;
   convergence in rtol and starting radius $r_0$.
-- [ ] **3. Capture boundary** $\tilde b_c$ by bisection.
+- [x] **3. Capture boundary** $\tilde b_c$ by bisection.
   *Check:* both analytic branches at ~6 energies spanning $\tilde E=1/16$; logarithmic
   divergence of $\chi$ as $b\to b_c^+$ (barrier-limited regime).
 - [ ] **4. Rotational dynamics** (fixed-center mode + free 3D).

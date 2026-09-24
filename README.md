@@ -34,6 +34,7 @@ run_single.py  (CLI: one parameter point -> printed numbers, --plot)       (stag
        │                     events (contact r=2, periapsis, rigorous escape, r_out)
        ├─ physics/model.py   U, F_2, tau_1, tau_2                         (stage 1)
        └─ physics/observables.py  E, J, |m|-1 drift, deflection angle     (stage 2)
+physics/capture.py   bisection for the contact/escape edge b_c           (stage 3)
 physics/central.py   independent -kappa/r^3 oracle: b_c, quadrature Theta  (stages 2-3)
 ```
 

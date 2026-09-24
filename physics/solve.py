@@ -186,6 +186,7 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
 
     Returns dict with
         outcome            "contact" | "escape" | "timeout"
+        contact_via        "event" (r - 2 sign change) | "periapsis" (grazing dip) | None
         t_end, y_end       end time and state (for contact: state at first touch)
         r_min              smallest periapsis distance found (or r at contact)
         deflection         signed planar deflection with windings (nan if non-planar/not escaped)
@@ -216,7 +217,7 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
 
     # 1. Classify the outcome.
     y_end, t_end = sol.y[:, -1], sol.t[-1]
-    outcome, r_min, escape_time = "timeout", np.nan, np.nan
+    outcome, r_min, escape_time, contact_via = "timeout", np.nan, np.nan, None
     if not fixed_centers:
         t_contact, y_contact = sol.t_events[0], sol.y_events[0]
         t_peri, y_peri = sol.t_events[1], sol.y_events[1]
@@ -229,9 +230,9 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
             outcome = "contact"
             t_end = min(contact_times)
             if len(t_contact) and t_contact[0] == t_end:
-                y_end = y_contact[0]
+                y_end, contact_via = y_contact[0], "event"
             else:
-                y_end = y_peri[grazing[0]]
+                y_end, contact_via = y_peri[grazing[0]], "periapsis"
             r_min = min(np.linalg.norm(y_end[0:3]), np.nanmin([r_min, np.inf]))
         elif len(sol.t_events[2]) or len(sol.t_events[3]):
             outcome = "escape"
@@ -249,7 +250,7 @@ def run_trajectory(energy, impact_parameter, m1, m2, w1=(0, 0, 0), w2=(0, 0, 0),
         deflection, deflection_3d = observables.deflection_angles(y0, y_end)
 
     result = {
-        "outcome": outcome, "t_end": t_end, "y_end": y_end, "y0": y0, "r_min": r_min,
+        "outcome": outcome, "contact_via": contact_via, "t_end": t_end, "y_end": y_end, "y0": y0, "r_min": r_min,
         "deflection": deflection, "deflection_3d": deflection_3d, "escape_time": escape_time,
         "energy_initial": energy_series[0],
         "energy_drift": observables.relative_drift(energy_series),
