@@ -120,7 +120,18 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
     Exact tail-to-tail is 4.18.
   - [x] **8e. Notebook section 10** for stage 8 and updated summary (section 11), from
     `tests/reference/zoom_maps.npz` and `uncertainty_summary.json`.
-- [ ] **6a. $\tilde b_c(\tilde E)$** for head-to-tail vs. locked and $+z/-z$ curves (deferred).
+- [ ] **6a. Collision edge vs. energy** (approved 2026-09-24; in-plane orientations only).
+  16 energies $10^{-3}\le\tilde E\le10$ (log-spaced, incl. the paper value and the crossovers
+  $1/16$, $1/8$). Per energy: a $32\times32$ symmetry-reduced map (`analysis/energy_scan.py`), with
+  $b_{\max}=\max(10,\,2b_c^{\rm locked})$ at $\Delta b\approx0.05$ and $r_0=\max(1000,\,64000\cdot\tilde E_{\rm paper}/\tilde E)$
+  (holds the in-state error $\propto(1/\tilde I\tilde Er_0)^2$ at its validated level).
+  Outputs: head-to-tail $b_{\rm out}(\tilde E)$; $\sigma=2\langle b_{\rm out}\rangle$ over orientations, plus
+  the capture-measure version; min/max over orientations; fraction with escape windows.
+  *Checks:* (1) $+z/-z$ matches the analytic $b_c$ on both branches; (2) head-to-tail
+  $b_{\rm out}/b_c^{\rm locked}\to1$ as $\tilde E\to0$ (adiabatic limit); (3) $b_{\rm out}\to2$ as
+  $\tilde E\to\infty$, with $(b_{\rm out}^2-4)\tilde E$ finite; (4) at the paper energy the head-to-tail
+  edge is 5.7546 and the map matches `map_torus32.npz`; (5) at the extreme energies, 2x $r_0$,
+  tighter rtol and a 2x scan on sampled points; orientation-grid error from $16\times16$ subsampling.
 
 ## Findings so far
 
