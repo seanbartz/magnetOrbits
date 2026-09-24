@@ -37,6 +37,11 @@ run_single.py  (CLI: one parameter point -> printed numbers, --plot)       (stag
        │                     optional fixed centers                          (stage 4)
        ├─ physics/model.py   U, F_2, tau_1, tau_2                         (stage 1)
        └─ physics/observables.py  E, J, |m|-1 drift, deflection angle     (stage 2)
+sweep.py  (orientation maps over (phi1, phi2), 18 workers, resumable)     (stage 6b)
+  └─ physics/edges.py        capture_profile: scan b + bisect every edge;
+                             symmetry reduction; load_map                    (stage 6b)
+       └─ physics/solve.run_trajectory   (same code path as run_single.py)
+analysis/map_checks.py   full-torus symmetry check + map figures           (stage 6b)
 physics/capture.py   bisection for the contact/escape edge b_c           (stage 3)
 physics/central.py   independent -kappa/r^3 oracle: b_c, quadrature Theta  (stages 2-3)
 ```
@@ -50,6 +55,15 @@ re-inspected with `run_single.py`.
 python run_single.py --energy 0.03 --b 5 --preset antiparallel-z      # exact -1/r^3 case
 python run_single.py --energy 0.03 --b 6 --preset head-to-tail --plot  # paper's configuration
 python run_single.py --energy 0.1 --b 4 --m1 1 0 0 --m2 0 1 0          # any lab-frame moments
+```
+
+Orientation maps (in-plane asymptotic moment angles $\phi_1,\phi_2$ from the incoming
+direction; defaults to the paper energy $\tilde E=0.033501$):
+
+```bash
+python sweep.py --name torus32 --n-phi 32                  # full torus (~27 min, 18 workers)
+python sweep.py --name fund64 --n-phi 64 --fundamental     # symmetry-reduced domain
+python analysis/map_checks.py results/torus32              # checks + figures/
 ```
 
 ## Tests

@@ -20,7 +20,8 @@ Collect into arrays with physics.edges.load_map(results/<name>).
 
 Parallelization: independent points over ProcessPoolExecutor, BLAS pinned to 1 thread per
 worker (set before numpy is imported), 18 workers by default on the 20-core Mac Studio.
-Cost: ~20 s per point at n_scan = 200 (measured), so 1024 points ~ 20 min on 18 workers.
+Cost: ~28 s per point at n_scan = 200 with 18 concurrent workers (measured), so 1024 points
+take ~27-30 min on the Mac Studio.
 """
 
 import os
@@ -61,6 +62,10 @@ def parse_args():
     p.add_argument("--b-max", type=float, default=10.0)
     p.add_argument("--n-scan", type=int, default=200)
     p.add_argument("--rel-tol", type=float, default=1e-6)
+    # r0: with the first-order in-state correction the edges converge as r0^-2. At E = 0.0335
+    # r0 = 1000 leaves up to 5e-4 relative error near the low-edge "diamond"; r0 = 64000 leaves
+    # <= 3e-7 (Richardson, measured), below rel_tol, for ~15% more cost.
+    p.add_argument("--start-radius", type=float, default=64000.0)
     p.add_argument("--workers", type=int, default=min(18, os.cpu_count() or 1))
     p.add_argument("--limit", type=int, default=None, help="only the first N pending points (smoke test)")
     return p.parse_args()
@@ -76,12 +81,12 @@ def main():
     n = args.n_phi
     pairs = fundamental_domain(n) if args.fundamental else [(i, j) for i in range(n) for j in range(n)]
     settings = dict(energy=args.energy, b_min=args.b_min, b_max=args.b_max, n_scan=args.n_scan,
-                    rel_tol=args.rel_tol)
+                    rel_tol=args.rel_tol, start_radius=args.start_radius)
 
     # 2. Metadata (refuse to mix settings with an existing run).
     head, dirty = git_state()
     meta = dict(settings=settings, n_phi=n, fundamental=args.fundamental, git_hash=head,
-                git_dirty=dirty, solver="run_trajectory defaults: r0=1000, rtol=1e-10, atol=1e-12, "
+                git_dirty=dirty, solver="run_trajectory: r0=settings.start_radius, rtol=1e-10, atol=1e-12, "
                 "beta=0.4, asymptotic_correction=True, stop='escape'",
                 started=time.strftime("%Y-%m-%d %H:%M:%S"), host=platform.node())
     meta_file = out_dir / "meta.json"
