@@ -54,7 +54,15 @@ def main():
 
     data = load_map(args.result_dir, expand_symmetry=False)
     n, settings = data["meta"]["n_phi"], data["meta"]["settings"]
-    reps = [r for r in fundamental_domain(n) if r in data["records"]]
+    # Refuse partial or failed maps: sampling only what exists could "pass" on few or no points.
+    full_torus = not data["meta"].get("fundamental", False)
+    expected = {(i, j) for i in range(n) for j in range(n)} if full_torus else set(fundamental_domain(n))
+    missing = expected - set(data["records"])
+    if missing or data["errors"]:
+        print(f"INCOMPLETE map: {len(missing)} of {len(expected)} points missing, "
+              f"{len(data['errors'])} failed; resume the sweep first  -> FAIL")
+        raise SystemExit(1)
+    reps = fundamental_domain(n)
     multi = [r for r in reps if data["records"][r]["n_intervals"] != 1]
     single = [r for r in reps if r not in multi]
     rng = np.random.default_rng(args.seed)
