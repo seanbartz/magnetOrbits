@@ -74,6 +74,52 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   `run_trajectory(method="numba")` reproduces every reference-path test case; recomputed
   $32\times32$ map matches `tests/reference/map_torus32.npz` (identical interval counts, edges
   to $2\times10^{-6}$); measured speedup reported.
+- [ ] **8. Zoomed maps of the antiparallel dip and the mirror trough** (started 2026-09-24).
+  Strip coordinates (`physics/edges.py`): $s$ along the line, $d$ across it; antiparallel
+  $\phi_1=s$, $\phi_2=s+\pi+d$; mirror $\phi_1=s$, $\phi_2=\pi-s+d$. Steps $\pi/64$ along and
+  $\pi/512$ ($0.35^\circ$, 32x finer than the torus map) across, chosen so strip points coincide
+  with torus points. $\tilde E=0.033501$, $r_0=64000$, numba.
+  - [x] **8a. Strip grids** in `sweep.py` (`--strip`, `--along-pi`, `--across-pi`).
+    *Check:* strip points on the torus grid reproduce `map_torus32.npz` (incl. a window point);
+    resume refuses a changed grid.
+  - [x] **8b. Antiparallel strip**, $s\in[0,\pi)$ (64), $d\in[-5\pi/64,5\pi/64]$ (81).
+    *Check:* $b_{\rm out}$ identical to $7.7\times10^{-7}$ under a 4x finer $b$ scan (PASS). Interval
+    structure differs at 16/5184 points, all near $s\to0,\pi$ where the strip crosses the mirror
+    band (see 8c). *Result:* the dip is a smooth cusp, resolved: $b_{\rm out}=4.69$–$4.72$ on the
+    line, full width at half depth $0.031\pi$ ($5.6^\circ$), $b_{\rm out}(d)-b_{\rm out}(0)\propto|d|^{0.57}$,
+    the same at every $s$.
+  - [~] **8c. Mirror strip**, $s\in[0,\pi)$ (64), $d\in[-3\pi/16,3\pi/32]$ (145).
+    *Check:* $b_{\rm out}$ identical to $7.7\times10^{-7}$ under the 4x scan (PASS). Interval counts
+    and capture measure do **not** converge: the 4x scan changes the structure at 884/9280 points
+    (thin escape windows at $b\approx0.15$–$1.35$, width $0.02$–$0.04$, below the $\Delta b=0.05$ scan),
+    and at one point a 64x scan splits a window into three (sub-windows at $\Delta b\sim10^{-3}$).
+    *Result:* the "trough" is a band $-0.075\pi\lesssim d\lesssim0$ below the mirror line, bounded on
+    its low side by a sharp jump in $b_{\rm out}$; escape windows fill the band. Near
+    $s\to0,\pi$ (head-to-head / tail-to-tail) $b_{\rm out}$ drops to $2.46$ at
+    $(\phi_1,\phi_2)=(0.969\pi,1.975\pi)$, far below the torus minimum 4.18.
+  - [ ] **8d. Instability hypothesis:** growth of a small offset from exact antiparallel along the
+    trajectory, compared with the measured dip width. *First probe:* the spin-mismatch
+    amplification is linear and reaches $A\sim10^2$–$10^3$ near $b_{\rm out}$, which predicts widths
+    $\sim10^{-3}$–$10^{-2}$ rad against the measured $0.1$ rad (smooth cusp), so a simple
+    $1/A$ picture does not explain the dip.
+  - [x] **8f. Fine structure of the window band** (`physics/fractal.py`, `analysis/uncertainty.py`).
+    Uncertainty exponent $f(\epsilon)\propto\epsilon^\alpha$ ($D=1-\alpha$), $5\times10^4$ samples per point,
+    fit over $\epsilon\le L/30$. *Check:* the controls with one smooth edge give
+    $\alpha=0.990\pm0.020$ ($+z/-z$) and $0.971\pm0.017$ (antiparallel line), with counts
+    Poisson-consistent with $f=2\epsilon/L$. *Result:* band points give $\alpha=0.351\pm0.003$ and $0.266\pm0.003$ ($D\approx0.65$, $0.73$), so the band has a **fractal boundary**; a two-edge window in the band gives $0.998\pm0.016$. The dimension is local: an earlier run that sampled only the inner 64% of band B's interval (fixed in the PR #7 self-review) gave $0.14$. Edges resolved grow 8 → 214 and 6 → 260 over a 256x scan refinement, while
+    the capture measure changes by $\lesssim2$–$3\%$ (fat fractal). Robust to rtol $10^{-12}$ and
+    $r_0=128000$ (counts Poisson-consistent; 0.5–0.7% of individual samples flip, as expected
+    near a fractal set).
+  - [x] **8g. Tail-to-tail corner** (patches at $\pi/512$ and $\pi/8192$ around $(\pi,0)$).
+    *Check:* $b_{\rm out}$ converged to $9.3\times10^{-7}$ on the coarse patch. In the fine patch
+    (re-centered after PR #7 review; it was off-center) 1.2% of points gain a thin contact sliver
+    above $b_{\rm out}$ under the 4x scan, so $b_{\rm out}$ is a lower bound there. *Result:* a low region,
+    $b_{\rm out}\approx2.2$–$2.5$, bounded by two sharp edges that meet at the antiparallel cusp; the
+    lowest outer edge, $2.13$, lies at that corner, $(\phi_1,\phi_2)\approx(0.975\pi,-0.025\pi)$.
+    The deepest pixel went 2.46 (strip) → 2.17 (coarse patch) → 2.13 (fine patch, both runs).
+    Exact tail-to-tail is 4.18.
+  - [x] **8e. Notebook section 10** for stage 8 and updated summary (section 11), from
+    `tests/reference/zoom_maps.npz` and `uncertainty_summary.json`.
 - [ ] **6a. $\tilde b_c(\tilde E)$** for head-to-tail vs. locked and $+z/-z$ curves (deferred).
 
 ## Findings so far

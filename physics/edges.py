@@ -177,17 +177,49 @@ def fundamental_domain(n):
     return sorted({min(symmetry_orbit(i, j, n)) for i in range(n) for j in range(n)})
 
 
-def sweep_point(energy, i, j, n_phi, settings):
-    """One orientation-map point as a JSON-serializable dict (the sweep.py worker)."""
+# ---------------------------------------------------------------------------------------
+# Strips: zoomed grids straddling a line in the (phi1, phi2) torus (stage 8)
+# ---------------------------------------------------------------------------------------
+# Coordinates: s runs ALONG the line, d measures the offset ACROSS it (both in radians).
+#   antiparallel:  phi1 = s,  phi2 = s + pi + d     (d = 0: m2 = -m1, an invariant family)
+#   mirror:        phi1 = s,  phi2 = pi - s + d     (d = 0: m2 = m1 reflected across the y axis)
+#   box:           phi1 = s,  phi2 = d              (a plain 2D patch of the torus)
+# Grid specs are given in units of pi so that grid points can coincide exactly (to rounding)
+# with the 32 x 32 torus map (steps pi/16): `along` is periodic (endpoint excluded), `across`
+# includes both ends.
+STRIP_LINES = ("antiparallel", "mirror", "box")
+
+
+def strip_angles(line, s, d):
+    """(phi1, phi2) for strip coordinates (s along, d across) of the named line."""
+    if line == "antiparallel":
+        return s, s + np.pi + d
+    if line == "mirror":
+        return s, np.pi - s + d
+    if line == "box":
+        return s, d
+    raise ValueError(f"unknown strip line {line!r}; expected one of {STRIP_LINES}")
+
+
+def strip_axes(grid):
+    """(along, across) coordinate arrays in radians for a strip grid spec (see sweep.py)."""
+    a_lo, a_hi, n_along = grid["along_pi"]
+    c_lo, c_hi, n_across = grid["across_pi"]
+    along = np.pi * np.linspace(a_lo, a_hi, int(n_along), endpoint=False)
+    across = np.pi * np.linspace(c_lo, c_hi, int(n_across))
+    return along, across
+
+
+def profile_record(energy, phi1, phi2, settings, ids):
+    """Capture profile at (phi1, phi2) as a JSON-serializable dict, tagged with `ids`."""
     import time
-    phi1, phi2 = 2 * np.pi * i / n_phi, 2 * np.pi * j / n_phi
     t0 = time.time()
     prof = in_plane_profile(energy, phi1, phi2, b_min=settings["b_min"], b_max=settings["b_max"],
                             n_scan=settings["n_scan"], rel_tol=settings["rel_tol"],
                             start_radius=settings.get("start_radius", 1000.0),
                             method=settings.get("method", "reference"))
     return {
-        "i": i, "j": j, "n_phi": n_phi, "phi1": phi1, "phi2": phi2,
+        **ids, "phi1": float(phi1), "phi2": float(phi2),
         "outer_edge": None if np.isnan(prof["outer_edge"]) else float(prof["outer_edge"]),
         "capture_measure": None if np.isnan(prof["capture_measure"]) else prof["capture_measure"],
         "n_intervals": prof["n_intervals"], "unresolved": [list(u) for u in prof["unresolved"]],
@@ -197,22 +229,47 @@ def sweep_point(energy, i, j, n_phi, settings):
     }
 
 
-def load_map(result_dir, expand_symmetry=True):
-    """Read results/<name>/ into (n_phi, n_phi) arrays indexed [i, j].
+def sweep_point(energy, i, j, n_phi, settings):
+    """One torus-map point (phi = 2 pi i / n_phi, 2 pi j / n_phi): the sweep.py worker."""
+    return profile_record(energy, 2 * np.pi * i / n_phi, 2 * np.pi * j / n_phi, settings,
+                          {"i": i, "j": j, "n_phi": n_phi})
 
-    With expand_symmetry, points computed on the fundamental domain are copied to every
-    member of their symmetry orbit. Missing points are nan; failed points are listed.
+
+def strip_point(energy, i, j, grid, settings):
+    """One strip point (i along, j across) of a strip grid spec: the sweep.py worker."""
+    along, across = strip_axes(grid)
+    phi1, phi2 = strip_angles(grid["line"], along[i], across[j])
+    return profile_record(energy, phi1, phi2, settings,
+                          {"i": i, "j": j, "along": float(along[i]), "across": float(across[j])})
+
+
+def load_map(result_dir, expand_symmetry=True):
+    """Read results/<name>/ into arrays indexed [i, j].
+
+    Torus runs give (n_phi, n_phi) arrays; with expand_symmetry, points computed on the
+    fundamental domain are copied to every member of their symmetry orbit. Strip runs (meta
+    "grid" kind "strip") give (n_along, n_across) arrays plus the coordinate axes "along",
+    "across" and the angle arrays "phi1", "phi2"; no symmetry expansion. Missing points are
+    nan; failed points are listed.
     """
     import json
     from pathlib import Path
     result_dir = Path(result_dir)
     meta = json.loads((result_dir / "meta.json").read_text())
-    n = meta["n_phi"]
-    outer = np.full((n, n), np.nan)
-    measure = np.full((n, n), np.nan)
-    n_intervals = np.full((n, n), -1)
-    timeouts = np.zeros((n, n), dtype=int)
-    computed = np.zeros((n, n), dtype=bool)
+    grid = meta.get("grid", {"kind": "torus"})
+    strip = grid["kind"] == "strip"
+    if strip:
+        along, across = strip_axes(grid)
+        shape = (len(along), len(across))
+        expand_symmetry = False
+    else:
+        n = meta["n_phi"]
+        shape = (n, n)
+    outer = np.full(shape, np.nan)
+    measure = np.full(shape, np.nan)
+    n_intervals = np.full(shape, -1)
+    timeouts = np.zeros(shape, dtype=int)
+    computed = np.zeros(shape, dtype=bool)
     records, errors = {}, []
     for line in (result_dir / "points.jsonl").read_text().splitlines():
         rec = json.loads(line)
@@ -231,7 +288,47 @@ def load_map(result_dir, expand_symmetry=True):
             n_intervals[a, b] = rec["n_intervals"]
             timeouts[a, b] = rec["n_timeouts"]
         computed[i, j] = True
-    phi = 2 * np.pi * np.arange(n) / n
-    return {"meta": meta, "phi": phi, "outer_edge": outer, "capture_measure": measure,
+    data = {"meta": meta, "grid": grid, "outer_edge": outer, "capture_measure": measure,
             "n_intervals": n_intervals, "n_timeouts": timeouts, "computed": computed,
             "records": records, "errors": errors}
+    if strip:
+        s_grid, d_grid = np.meshgrid(along, across, indexing="ij")
+        phi1, phi2 = strip_angles(grid["line"], s_grid, d_grid)
+        data.update(along=along, across=across, phi1=phi1, phi2=phi2)
+    else:
+        data["phi"] = 2 * np.pi * np.arange(n) / n
+    return data
+
+
+def completeness(data):
+    """Why a loaded run cannot be used as a finished map, if at all.
+
+    Returns dict(missing=[...], failed=[...], unresolved=[...]) of (i, j) keys: expected points
+    with no record, points whose worker raised, and points whose profile has unresolved
+    (timeout) ranges -- a successful record, but with undecided intervals (n_intervals = -1).
+    The run is complete only if all three lists are empty.
+    """
+    missing = sorted(expected_points(data["meta"]) - set(data["records"]))
+    failed = sorted((e["i"], e["j"]) for e in data["errors"])
+    unresolved = sorted(k for k, rec in data["records"].items() if rec.get("unresolved"))
+    return {"missing": missing, "failed": failed, "unresolved": unresolved}
+
+
+def completeness_problem(data):
+    """One-line description of what makes the run incomplete, or None if it is complete."""
+    c = completeness(data)
+    if not any(c.values()):
+        return None
+    return (f"{len(c['missing'])} expected points missing, {len(c['failed'])} failed, "
+            f"{len(c['unresolved'])} with unresolved (timeout) ranges")
+
+
+def expected_points(meta):
+    """Every (i, j) a complete run must contain (torus: full or fundamental domain; strip: all)."""
+    grid = meta.get("grid", {"kind": "torus"})
+    if grid["kind"] == "strip":
+        return {(i, j) for i in range(int(grid["along_pi"][2])) for j in range(int(grid["across_pi"][2]))}
+    n = meta["n_phi"]
+    if meta.get("fundamental", False):
+        return set(fundamental_domain(n))
+    return {(i, j) for i in range(n) for j in range(n)}

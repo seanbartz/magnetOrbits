@@ -47,6 +47,10 @@ sweep.py  (orientation maps over (phi1, phi2), 18 workers, resumable)     (stage
                              symmetry reduction; load_map                    (stage 6b)
        └─ physics/solve.run_trajectory   (same code path as run_single.py)
 analysis/map_checks.py   full-torus symmetry check + map figures           (stage 6b)
+sweep.py --strip {antiparallel,mirror,box}   zoomed strips / patches        (stage 8)
+physics/fractal.py   uncertainty exponent, resolution scaling               (stage 8)
+analysis/uncertainty.py, strip_maps.py, run_strips.sh, run_corner.sh,
+  save_zoom_reference.py   stage-8 runs, figures, stored references         (stage 8)
 physics/fast.py   compiled DOP853 + events + in-state quadrature;
                   run_trajectory(..., method="numba"), ~380x faster        (stage 7)
 analysis/compare_maps.py   map vs stored reference (numba vs scipy)        (stage 7)

@@ -28,7 +28,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from physics import central                     # noqa: E402
-from physics.edges import fundamental_domain, load_map, symmetry_orbit   # noqa: E402
+from physics.edges import completeness, load_map, symmetry_orbit   # noqa: E402
 
 EDGE_RTOL = 2e-6
 
@@ -95,23 +95,34 @@ def make_figures(data, stem):
 
 def main():
     result_dir = Path(sys.argv[1])
-    full_torus = not __import__("json").loads((result_dir / "meta.json").read_text())["fundamental"]
+    meta = __import__("json").loads((result_dir / "meta.json").read_text())
+    strip = meta.get("grid", {"kind": "torus"})["kind"] == "strip"
+    full_torus = not strip and not meta["fundamental"]
     data = load_map(result_dir, expand_symmetry=not full_torus)
     n = data["meta"]["n_phi"]
     energy = data["meta"]["settings"]["energy"]
-    print(f"{result_dir.name}: n_phi = {n}, E = {energy:.6f}, git {data['meta']['git_hash'][:8]}"
-          f"{' (dirty)' if data['meta']['git_dirty'] else ''}")
+    shape = "x".join(str(k) for k in data["outer_edge"].shape)
+    print(f"{result_dir.name}: {'strip ' + data['grid']['line'] if strip else 'torus'} {shape}, "
+          f"E = {energy:.6f}, git {data['meta']['git_hash'][:8]}{' (dirty)' if data['meta']['git_dirty'] else ''}")
     print(f"points: {len(data['records'])} computed, {len(data['errors'])} failed, "
           f"{int(np.isnan(data['outer_edge']).sum())} missing/no-capture")
 
     # A partial run (--limit, failed points) must not pass or be plotted: the symmetry check only
     # compares partners that exist, so missing points would otherwise go unnoticed.
-    expected = {(i, j) for i in range(n) for j in range(n)} if full_torus else set(fundamental_domain(n))
-    missing = expected - set(data["records"])
-    if missing or data["errors"]:
-        print(f"INCOMPLETE map: {len(missing)} of {len(expected)} expected points missing, "
-              f"{len(data['errors'])} failed (e.g. {sorted(missing)[:5]}); resume the sweep first  -> FAIL")
+    # Undecided profiles (timeouts inside capture_profile) are successful records with
+    # unresolved ranges; they must not pass either, on the torus or on a strip.
+    c = completeness(data)
+    if any(c.values()):
+        print(f"INCOMPLETE map: {len(c['missing'])} expected points missing (e.g. {c['missing'][:5]}), "
+              f"{len(c['failed'])} failed, {len(c['unresolved'])} with unresolved (timeout) ranges "
+              f"(e.g. {c['unresolved'][:5]})  -> FAIL")
         raise SystemExit(1)
+    if strip:
+        counts = {int(k): int((data["n_intervals"] == k).sum()) for k in np.unique(data["n_intervals"])}
+        print(f"complete; outer edge {np.nanmin(data['outer_edge']):.4f} .. {np.nanmax(data['outer_edge']):.4f}; "
+              f"interval counts {counts}; timeouts {int(data['n_timeouts'].sum())}. "
+              "Strip figures: analysis/strip_maps.py")
+        return
 
     if full_torus:
         worst, mismatches, compared = symmetry_check(data)

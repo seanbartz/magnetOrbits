@@ -31,7 +31,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from physics.edges import fundamental_domain, in_plane_profile, load_map   # noqa: E402
+from physics.edges import completeness_problem, expected_points, fundamental_domain, in_plane_profile, load_map   # noqa: E402
 
 TIGHT_TOLERANCES = dict(rtol=1e-12, atol=1e-14)
 EDGE_THRESHOLD = 3e-6
@@ -53,16 +53,15 @@ def main():
     args = p.parse_args()
 
     data = load_map(args.result_dir, expand_symmetry=False)
-    n, settings = data["meta"]["n_phi"], data["meta"]["settings"]
+    settings = data["meta"]["settings"]
     # Refuse partial or failed maps: sampling only what exists could "pass" on few or no points.
-    full_torus = not data["meta"].get("fundamental", False)
-    expected = {(i, j) for i in range(n) for j in range(n)} if full_torus else set(fundamental_domain(n))
-    missing = expected - set(data["records"])
-    if missing or data["errors"]:
-        print(f"INCOMPLETE map: {len(missing)} of {len(expected)} points missing, "
-              f"{len(data['errors'])} failed; resume the sweep first  -> FAIL")
+    expected = expected_points(data["meta"])
+    problem = completeness_problem(data)
+    if problem:
+        print(f"INCOMPLETE map: {problem}; resume or rerun the sweep first  -> FAIL")
         raise SystemExit(1)
-    reps = fundamental_domain(n)
+    # Sample pool: torus -> one point per symmetry orbit; strip -> every point.
+    reps = sorted(expected) if data["grid"]["kind"] == "strip" else fundamental_domain(data["meta"]["n_phi"])
     multi = [r for r in reps if data["records"][r]["n_intervals"] != 1]
     single = [r for r in reps if r not in multi]
     rng = np.random.default_rng(args.seed)
