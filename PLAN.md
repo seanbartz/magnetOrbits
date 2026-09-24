@@ -120,7 +120,7 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
     Exact tail-to-tail is 4.18.
   - [x] **8e. Notebook section 10** for stage 8 and updated summary (section 11), from
     `tests/reference/zoom_maps.npz` and `uncertainty_summary.json`.
-- [ ] **6a. Collision edge vs. energy** (approved 2026-09-24; in-plane orientations only).
+- [x] **6a. Collision edge vs. energy** (approved 2026-09-24; in-plane orientations only).
   16 energies $10^{-3}\le\tilde E\le10$ (log-spaced, incl. the paper value and the crossovers
   $1/16$, $1/8$). Per energy: a $32\times32$ symmetry-reduced map (`analysis/energy_scan.py`), with
   $b_{\max}=\max(10,\,2b_c^{\rm locked})$ at $\Delta b\approx0.05$ and $r_0=\max(1000,\,64000\cdot\tilde E_{\rm paper}/\tilde E)$
@@ -132,6 +132,21 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   $\tilde E\to\infty$, with $(b_{\rm out}^2-4)\tilde E$ finite; (4) at the paper energy the head-to-tail
   edge is 5.7546 and the map matches `map_torus32.npz`; (5) at the extreme energies, 2x $r_0$,
   tighter rtol and a 2x scan on sampled points; orientation-grid error from $16\times16$ subsampling.
+  *Results* (all checks PASS; `tests/reference/energy_scan.json`, notebook section 11):
+  - $+z/-z$ edge matches the analytic formula to $4.5\times10^{-8}$ at all 16 energies (both branches).
+  - Slow limit: head-to-tail $b_{\rm out}/b_c^{\rm locked}=1.008$ at $\tilde E=10^{-3}$, approaching 1 as
+    $\tilde E^{0.64}$; the orientation average is $1.0006$ there. The minimum over orientations is
+    head-to-head and approaches $(1/2)^{1/3}$ (the $\kappa=1$ law: 0.7964 at $10^{-3}$), as the
+    antiparallel invariant family predicts.
+  - Head-to-tail beats the locked law by up to $12\%$ at the crossover $\tilde E=1/8$, then falls
+    below it (0.96 at $\tilde E=0.5$–1). The orientation average peaks at $+4\%$ near $0.05$ and
+    reaches $0.86$ at $\tilde E\approx0.5$.
+  - Fast limit: $b_{\rm out}\to2$ ($2.013$ at $\tilde E=10$), with $(b^2-4)\tilde E\to0.51$, i.e.
+    $\kappa_{\rm eff}\approx1.03$.
+  - Escape windows only for $0.02\lesssim\tilde E\lesssim0.2$ (the grid-limited 3.1% plateau is one
+    diagonal of the $32\times32$ grid).
+  - Resolution: $2r_0$, rtol $10^{-12}$ and a 2x scan change the maps by $\le7.7\times10^{-7}$ at
+    $\tilde E=10^{-3}$, $0.0335$ and 10; orientation-grid error $\le0.8\%$.
 
 ## Findings so far
 
