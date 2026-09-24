@@ -44,7 +44,7 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
 - [x] **3. Capture boundary** $\tilde b_c$ by bisection.
   *Check:* both analytic branches at ~6 energies spanning $\tilde E=1/16$; logarithmic
   divergence of $\chi$ as $b\to b_c^+$ (barrier-limited regime).
-- [ ] **4. Rotational dynamics** (fixed-center mode + free 3D).
+- [x] **4. Rotational dynamics** (fixed-center mode + free 3D).
   *Check:* head-to-tail small-oscillation frequencies $\omega^2=3/\tilde Ir^3,\,1/\tilde Ir^3$;
   $+z/-z$ scissor-instability growth rate; $E$ and $\mathbf J=\mathbf L+\mathbf S_1+\mathbf S_2$
   conserved in generic 3D runs while $\mathbf L$ alone is not.
@@ -59,6 +59,17 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   show the $r_0$-convergence order improves from 1 to 2.
 - [ ] **6. New phase (re-plan)**: $\tilde b_c(\tilde E)$ and outcome maps over orientations,
   using the symmetries $\hat\mu\to-\hat\mu$ (both) and $1\leftrightarrow2$.
+
+## Findings so far
+
+- **$+z/-z$ is exact but fragile** (stage 4). Scissor growth rate at fixed $r$ is
+  $\sigma=1/\sqrt{\tilde I r^3}$ (verified to $10^{-8}$). In scattering, a $10^{-6}$ tilt toward
+  $\hat r$ changes the deflection at $\tilde E=0.03$ by $2\times10^{-10}$, $10^{-6}$, $0.04$,
+  $4.6$ rad at $b/b_c=2,\,1.05,\,1.01,\,1.001$; at $\tilde E=0.3$ (contact-limited) by
+  $\lesssim10^{-10}$. So the power-law $b_c$ is the edge of a measure-zero manifold: for a real
+  pair near the barrier-limited edge, the orbiting phase amplifies any tilt enormously.
+- Contact-limited branch is $\sqrt{4+\kappa/2\tilde E}$ (an early code version had
+  $\sqrt{4+\kappa/\tilde E}$; caught by a test precondition).
 
 ## Cost outlook
 

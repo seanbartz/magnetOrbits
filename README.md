@@ -30,8 +30,10 @@ Physical units appear only in `physics/model.py` (`scales`, `physical_to_dimensi
 
 ```
 run_single.py  (CLI: one parameter point -> printed numbers, --plot)       (stage 2)
-  └─ physics/solve.py        run_trajectory: in-state, solve_ivp DOP853,  (stage 2)
-       │                     events (contact r=2, periapsis, rigorous escape, r_out)
+  └─ physics/solve.py        run_trajectory: in-state, events (contact r=2,  (stage 2)
+       │                     periapsis, rigorous escape, r_out)
+       │                     integrate_state: solve_ivp DOP853 from any state,
+       │                     optional fixed centers                          (stage 4)
        ├─ physics/model.py   U, F_2, tau_1, tau_2                         (stage 1)
        └─ physics/observables.py  E, J, |m|-1 drift, deflection angle     (stage 2)
 physics/capture.py   bisection for the contact/escape edge b_c           (stage 3)
