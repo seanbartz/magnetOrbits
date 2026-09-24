@@ -98,6 +98,16 @@ def scaling_job(args):
     return name, resolution_scaling(energy, m1, m2, b_lo, b_hi, SCAN_SIZES, SETTINGS)
 
 
+def git_state():
+    """(HEAD hash, dirty flag) over everything this analysis imports: the sweep's runtime paths
+    (physics/, sweep.py, tests/published for the default energy) and this script."""
+    from sweep import RUNTIME_PATHS
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    dirty = bool(subprocess.run(["git", "status", "--porcelain", *RUNTIME_PATHS, "analysis/uncertainty.py"],
+                                cwd=ROOT, capture_output=True, text=True).stdout)
+    return head, dirty
+
+
 def refit(summary):
     """Recompute alpha from stored counts with the current fit rule (no new trajectories)."""
     for pt in summary["points"].values():
@@ -118,6 +128,9 @@ def main():
     out_dir = ROOT / "results" / "uncertainty"
     if args.replot:
         summary = refit(json.loads((out_dir / "summary.json").read_text()))
+        head, dirty = git_state()            # the counts keep their run provenance; record the refit's too
+        summary["refit"] = {"git_hash": head, "git_dirty": dirty, "at": time.strftime("%Y-%m-%d %H:%M:%S")}
+        summary["git_dirty"] = summary["git_dirty"] or dirty
         (out_dir / "summary.json").write_text(json.dumps(summary, indent=1))
         for name, pt in summary["points"].items():
             print(f"{name:13s} alpha = {pt['alpha']:.3f} +- {pt['alpha_err']:.3f} "
@@ -129,11 +142,12 @@ def main():
         summary = json.loads((out_dir / "summary.json").read_text())
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
             summary["numerics"] = numerics_check(pool, args.workers)
+        head, dirty = git_state()
+        summary["numerics"].update(git_hash=head, git_dirty=dirty)
+        summary["git_dirty"] = summary["git_dirty"] or dirty
         (out_dir / "summary.json").write_text(json.dumps(summary, indent=1))
         return
-    git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    dirty = bool(subprocess.run(["git", "status", "--porcelain", "physics", "analysis/uncertainty.py"], cwd=ROOT,
-                                capture_output=True, text=True).stdout)
+    git, dirty = git_state()
     summary = {"settings": {**SETTINGS, "energy": ENERGY_TILDE, "epsilons": EPSILONS, "samples": args.samples,
                             "seed": args.seed, "scan_sizes": SCAN_SIZES},
                "git_hash": git, "git_dirty": dirty, "started": time.strftime("%Y-%m-%d %H:%M:%S"), "points": {}}

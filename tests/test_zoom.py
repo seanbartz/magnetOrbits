@@ -120,3 +120,28 @@ def test_regression_against_stored_zoom_maps(key, i, j):
     rec = strip_point(meta["settings"]["energy"], i, j, meta["grid"], meta["settings"])
     assert rec["n_intervals"] == zoom[f"{key}__n_intervals"][i, j]
     assert rec["outer_edge"] == pytest.approx(zoom[f"{key}__outer_edge"][i, j], rel=1e-9)
+
+
+def test_compare_maps_rejects_identically_incomplete_runs(tmp_path):
+    """Two runs truncated the same way must not PASS a directory-to-directory comparison."""
+    grid = {"kind": "strip", "line": "mirror", "along_pi": [0.0, 1.0, 2], "across_pi": [-0.1, 0.1, 2]}
+    for name in ("a", "b"):
+        d = tmp_path / name
+        d.mkdir()
+        (d / "meta.json").write_text(json.dumps({"grid": grid, "n_phi": 32, "fundamental": False,
+                                                 "settings": {"energy": 0.1}, "git_hash": "x", "git_dirty": False}))
+        rec = {"i": 0, "j": 0, "outer_edge": 5.0, "capture_measure": 4.0, "n_intervals": 1, "n_timeouts": 0,
+               "edges": [5.0], "edge_kinds": ["ce"], "seconds": 0.0}
+        (d / "points.jsonl").write_text(json.dumps(rec) + "\n")         # 1 of 4 points
+    out = subprocess.run([sys.executable, str(ROOT / "analysis" / "compare_maps.py"), str(tmp_path / "a"),
+                          str(tmp_path / "b")], capture_output=True, text=True)
+    assert out.returncode == 1 and "INCOMPLETE" in out.stdout
+
+
+@pytest.mark.parametrize("along", [["0", "1", "2.5"], ["0", "1", "0"], ["1", "0", "8"]])
+def test_sweep_rejects_bad_strip_counts(along):
+    out = subprocess.run([sys.executable, "sweep.py", "--name", "pytest_bad_counts", "--strip", "mirror",
+                          "--along-pi", *along, "--across-pi", "-0.1", "0.1", "5", "--limit", "0"],
+                         cwd=ROOT, capture_output=True, text=True, timeout=60)
+    shutil.rmtree(ROOT / "results" / "pytest_bad_counts", ignore_errors=True)
+    assert out.returncode != 0 and "--along-pi" in out.stderr + out.stdout

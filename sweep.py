@@ -122,6 +122,11 @@ def main():
     if args.strip:
         if args.along_pi is None or args.across_pi is None or args.fundamental:
             raise SystemExit("--strip needs --along-pi and --across-pi (and no --fundamental)")
+        for label, spec in (("--along-pi", args.along_pi), ("--across-pi", args.across_pi)):
+            if spec[2] != int(spec[2]) or spec[2] < (1 if label == "--along-pi" else 2):
+                raise SystemExit(f"{label}: the point count must be a positive integer (>= 2 across), got {spec[2]}")
+            if not spec[1] > spec[0]:
+                raise SystemExit(f"{label}: need HI > LO, got {spec[0]} {spec[1]}")
         grid = {"kind": "strip", "line": args.strip,
                 "along_pi": [args.along_pi[0], args.along_pi[1], int(args.along_pi[2])],
                 "across_pi": [args.across_pi[0], args.across_pi[1], int(args.across_pi[2])]}

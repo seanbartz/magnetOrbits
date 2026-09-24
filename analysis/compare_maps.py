@@ -25,7 +25,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from physics.edges import load_map   # noqa: E402
+from physics.edges import expected_points, load_map   # noqa: E402
 
 RTOL = 2e-6
 
@@ -61,12 +61,22 @@ def compare_edge_lists(new_records, ref_records):
     return kind_mismatch, worst
 
 
+def require_complete(data, label):
+    """Exit 1 unless the run has every expected point and no failed records."""
+    missing = expected_points(data["meta"]) - set(data["records"])
+    if missing or data["errors"]:
+        print(f"INCOMPLETE {label}: {len(missing)} expected points missing, {len(data['errors'])} failed  -> FAIL")
+        raise SystemExit(1)
+
+
 def main():
     paths = [a for a in sys.argv[1:] if not a.startswith("--")]
     new = load_map(paths[0])
+    require_complete(new, paths[0])
     ref_is_dir = Path(paths[1]).is_dir()
     if ref_is_dir:
         ref = load_map(paths[1])
+        require_complete(ref, paths[1])
         assert new["grid"] == ref["grid"], f"different grids: {new['grid']} vs {ref['grid']}"
         ref_settings = ref["meta"]["settings"]
     else:

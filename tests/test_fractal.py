@@ -19,6 +19,7 @@ Z = np.array([0.0, 0.0, 1.0])
 SETTINGS = dict(start_radius=64000.0, method="numba")
 
 
+@pytest.mark.slow
 def test_single_analytic_edge_gives_two_eps_over_L():
     b_lo, b_hi, n = 4.0, 4.5, 4000
     assert b_lo < central.capture_impact_parameter(ENERGY_TILDE, 1.0) < b_hi

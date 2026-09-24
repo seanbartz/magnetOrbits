@@ -11,7 +11,8 @@ better resolved of each pair) and results/uncertainty/summary.json, and writes
                                            with each run's settings, grid and git hash
     tests/reference/uncertainty_summary.json
 
-Refuses to write from runs recorded as git-dirty (the references must trace to committed code).
+Refuses to write from runs recorded as git-dirty (the references must trace to committed code),
+from incomplete runs (missing or failed points), or from an uncertainty summary that is dirty.
 """
 
 import json
@@ -24,7 +25,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from physics.edges import load_map   # noqa: E402
+from physics.edges import expected_points, load_map   # noqa: E402
 
 RUNS = ["strip_anti_scan800", "strip_mirror_scan800", "patch_tt_scan800", "patch_min_scan800"]
 
@@ -35,6 +36,10 @@ def main():
         data = load_map(ROOT / "results" / name)
         if data["meta"]["git_dirty"]:
             raise SystemExit(f"{name} was run from a dirty tree; rerun it from committed code first")
+        missing = expected_points(data["meta"]) - set(data["records"])
+        if missing or data["errors"]:
+            raise SystemExit(f"{name} is incomplete ({len(missing)} missing, {len(data['errors'])} failed); "
+                             "resume the sweep before storing it")
         key = name.replace("_scan800", "")
         arrays[f"{key}__outer_edge"] = data["outer_edge"]
         arrays[f"{key}__n_intervals"] = data["n_intervals"]
