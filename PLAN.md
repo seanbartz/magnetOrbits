@@ -1,6 +1,9 @@
 # PLAN — scattering and capture of two free magnetic spheres
 
-Approved 2026-09-23. Increments are checked off as their validation passes.
+Approved 2026-09-23. Increments are checked off as their validation passes. Each finished
+stage also gets a section in `notebooks/progress_summary.ipynb` (explanation, equations,
+validation figures from code imported from `physics/`, results table, next steps), committed
+with the stage. The notebook covers stages 1–7 as of 2026-09-24.
 
 ## Setup
 
@@ -108,10 +111,17 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   Accuracy check (18 points incl. all multi-interval orbits; rtol $10^{-12}$, $2r_0$, $2\times$ scan):
   identical interval structure, edges agree to $4.9\times10^{-7}$. Results:
   outer edge ranges from $4.178$ at $(\phi_1,\phi_2)=(0,\pi)$ (head-to-head, repulsive on approach)
-  to $5.756$ near head-to-tail; torus mean $5.565$ (locked-dipole value $5.373$). A low-edge
-  "diamond" runs along $\phi_1\pm\phi_2=\pi$ and is narrower than the grid (checkerboard
-  alternation along it: unresolved). 992/1024 orientations have one contact interval; 32 (the
-  diagonals $\phi_1+\phi_2=15\pi/16$ and its flip image) have an escape window at
+  to $5.756$ near head-to-tail; torus mean $5.565$ (locked-dipole value $5.373$), so most
+  orientations collide beyond the locked value. The low-edge "diamond" is two different features
+  (re-analyzed 2026-09-24):
+  - a sharp, symmetric dip on the antiparallel lines $\phi_2=\phi_1\pm\pi$ ($b_{\rm out}\approx4.7$
+    on the line, $\approx5.35$ one cell away). For $\hat\mu_2=-\hat\mu_1$ the torques are equal, so
+    this is an invariant family;
+  - a lopsided trough one cell below the mirror line $\phi_1+\phi_2=\pi$ (minimum 4.8–4.9 at
+    $15\pi/16$, 5.3 on the line).
+
+  Both are narrower than the grid (unresolved). 992/1024 orientations have one contact interval;
+  the 32 in the trough ($\phi_1+\phi_2=15\pi/16$ and its flip image) have an escape window at
   $b\approx2.78$–$3.03$ inside the contact region. No timeouts, no contact at $b_{\max}=10$.
 
 - **Compiled integrator** (stage 7): `method="numba"` takes the same DOP853 steps as scipy

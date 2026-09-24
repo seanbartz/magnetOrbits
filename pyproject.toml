@@ -5,6 +5,11 @@ description = "Scattering and capture of two free, spinning, uniformly magnetize
 requires-python = ">=3.9"
 dependencies = ["numpy>=1.21", "scipy>=1.9", "matplotlib>=3.5", "numba>=0.55"]
 
+[project.optional-dependencies]
+# progress notebook (notebooks/progress_summary.ipynb) and its execution test
+# (pytest: the notebook imports the seeded validation cases from tests/, which import pytest)
+notebook = ["jupyter", "nbconvert>=6", "ipykernel", "ipywidgets>=7", "pytest"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 norecursedirs = ["archive", "paper"]
