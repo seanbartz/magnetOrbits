@@ -90,6 +90,8 @@ def parse_args():
     # r0 = 1000 leaves up to 5e-4 relative error near the low-edge "diamond"; r0 = 64000 leaves
     # <= 3e-7 (Richardson, measured), below rel_tol, for ~15% more cost.
     p.add_argument("--start-radius", type=float, default=64000.0)
+    p.add_argument("--method", choices=("reference", "numba"), default="reference",
+                   help="numba: compiled DOP853 (physics/fast.py), ~300x faster per trajectory")
     p.add_argument("--workers", type=int, default=min(18, os.cpu_count() or 1))
     p.add_argument("--limit", type=int, default=None, help="only the first N pending points (smoke test)")
     return p.parse_args()
@@ -108,7 +110,7 @@ def main():
         raise SystemExit("--n-phi must be even (phi + pi must lie on the grid)")
     pairs = fundamental_domain(n) if args.fundamental else [(i, j) for i in range(n) for j in range(n)]
     settings = dict(energy=args.energy, b_min=args.b_min, b_max=args.b_max, n_scan=args.n_scan,
-                    rel_tol=args.rel_tol, start_radius=args.start_radius)
+                    rel_tol=args.rel_tol, start_radius=args.start_radius, method=args.method)
 
     # 2. Metadata (refuse to mix settings with an existing run).
     head, dirty = git_state()

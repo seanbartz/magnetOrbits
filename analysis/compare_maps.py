@@ -1,0 +1,70 @@
+"""Compare an orientation map against a stored reference map (e.g. numba vs scipy).
+
+Usage
+-----
+    python analysis/compare_maps.py results/torus32_numba tests/reference/map_torus32.npz
+    python analysis/compare_maps.py results/torus32_scan800 tests/reference/map_torus32.npz --scan-refinement
+
+Pass criteria (stage 7): identical contact-interval counts at every grid point, identical nan
+patterns (a value missing in only one map fails), and outer edge and capture measure equal to
+relative 2e-6 (twice the bisection rel_tol; the two integrators
+take the same steps, so differences only arise where a bisection midpoint falls within
+roundoff-amplified distance of an edge). Exits with status 1 on failure.
+"""
+
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from physics.edges import load_map   # noqa: E402
+
+RTOL = 2e-6
+
+
+def max_rel_diff(a, b):
+    """Max relative difference |a - b| / |b| over cells present in both maps.
+
+    A cell that is nan in only one map, or zero in one and nonzero in the other, counts as
+    infinite; equal cells (including 0 == 0, e.g. a zero capture measure) count as zero.
+    """
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    if a.shape != b.shape or not np.array_equal(np.isnan(a), np.isnan(b)):
+        return np.inf
+    both = ~np.isnan(a)
+    a, b = a[both], b[both]
+    if a.size == 0:
+        return 0.0
+    diff = np.abs(a - b)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rel = np.where(diff == 0.0, 0.0, diff / np.abs(b))   # b == 0 != a  ->  inf
+    return float(np.max(rel))
+
+
+def main():
+    paths = [a for a in sys.argv[1:] if not a.startswith("--")]
+    new = load_map(paths[0])
+    ref = np.load(paths[1])
+    ref_settings = json.loads(str(ref["settings"]))
+    # --scan-refinement: the new map may use a finer b scan (n_scan) than the reference; that is
+    # the whole-map test of the one-transition-per-scan-cell assumption (physics/edges.py).
+    ignore = {"method", "n_scan"} if "--scan-refinement" in sys.argv else {"method"}
+    new_settings = {k: v for k, v in new["meta"]["settings"].items() if k not in ignore}
+    assert new_settings == {k: v for k, v in ref_settings.items() if k not in ignore}, "different map settings"
+    same_intervals = np.array_equal(new["n_intervals"], ref["n_intervals"])
+    rel_edge = max_rel_diff(new["outer_edge"], ref["outer_edge"])
+    rel_measure = max_rel_diff(new["capture_measure"], ref["capture_measure"])
+    ok = same_intervals and rel_edge < RTOL and rel_measure < RTOL
+    print(f"interval counts identical: {same_intervals}; max rel diff outer edge {rel_edge:.1e}, "
+          f"capture measure {rel_measure:.1e} (tol {RTOL:.0e})  -> {'PASS' if ok else 'FAIL'}")
+    seconds = [r["seconds"] for r in new["records"].values()]
+    print(f"mean {np.mean(seconds):.2f} s per map point ({new['meta']['settings'].get('method')})")
+    if not ok:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()
