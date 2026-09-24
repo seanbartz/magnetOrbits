@@ -74,6 +74,20 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   `run_trajectory(method="numba")` reproduces every reference-path test case; recomputed
   $32\times32$ map matches `tests/reference/map_torus32.npz` (identical interval counts, edges
   to $2\times10^{-6}$); measured speedup reported.
+- [ ] **8. Zoomed maps of the antiparallel dip and the mirror trough** (started 2026-09-24).
+  Strip coordinates (`physics/edges.py`): $s$ along the line, $d$ across it; antiparallel
+  $\phi_1=s$, $\phi_2=s+\pi+d$; mirror $\phi_1=s$, $\phi_2=\pi-s+d$. Steps $\pi/64$ along and
+  $\pi/512$ ($0.35^\circ$, 32x finer than the torus map) across, chosen so strip points coincide
+  with torus points. $\tilde E=0.033501$, $r_0=64000$, numba.
+  - [x] **8a. Strip grids** in `sweep.py` (`--strip`, `--along-pi`, `--across-pi`).
+    *Check:* strip points on the torus grid reproduce `map_torus32.npz` (incl. a window point);
+    resume refuses a changed grid.
+  - [ ] **8b. Antiparallel strip**, $s\in[0,\pi)$ (64), $d\in[-5\pi/64,5\pi/64]$ (81).
+    *Check:* 4x scan refinement identical; tighter-numerics spot check.
+  - [ ] **8c. Mirror strip**, $s\in[0,\pi)$ (64), $d\in[-3\pi/16,3\pi/32]$ (145). Same checks.
+  - [ ] **8d. Instability hypothesis:** growth of a small offset from exact antiparallel along the
+    trajectory, compared with the measured dip width.
+  - [ ] **8e. Notebook section** for stage 8 and updated summary.
 - [ ] **6a. $\tilde b_c(\tilde E)$** for head-to-tail vs. locked and $+z/-z$ curves (deferred).
 
 ## Findings so far
