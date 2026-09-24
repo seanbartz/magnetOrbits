@@ -28,7 +28,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "analysis"))
 
-from energy_scan import (B_MIN, ENERGIES, N_PHI, antiparallel_z_edge, compare_with_torus_map,     # noqa: E402
+from energy_scan import (ANALYSIS_PATHS, B_MIN, ENERGIES, N_PHI, antiparallel_z_edge, compare_with_torus_map,     # noqa: E402
                          provenance, run_name, run_problem, scan_settings, settings_problem, sweep_settings,
                          weighted_stats)
 from physics import central                                                                     # noqa: E402
@@ -109,7 +109,11 @@ def test_compare_with_torus_map_fails_on_a_one_sided_missing_edge():
 
 
 def git_head():
-    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    """HEAD commit, or skip the calling test when not in a git checkout (e.g. a source archive)."""
+    out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True)
+    if out.returncode != 0:
+        pytest.skip("not a git checkout")
+    return out.stdout.strip()
 
 
 def test_provenance_rules():
@@ -130,12 +134,18 @@ def test_stored_scan_provenance_is_current():
     history (a shallow clone or a source archive).
     """
     rows = json.loads(REFERENCE.read_text())["rows"]
+    head = git_head()
     for h in {r["git_hash"] for r in rows}:
         if subprocess.run(["git", "cat-file", "-e", f"{h}^{{commit}}"], cwd=ROOT,
                           stderr=subprocess.DEVNULL).returncode != 0:
             pytest.skip(f"run commit {h[:8]} not in the local git history")
-    ok, detail = provenance(rows, git_head(), False)
+    ok, detail = provenance(rows, head, False)
     assert ok, f"{detail} -- rerun analysis/energy_scan.py and regenerate the reference"
+
+
+def test_analysis_paths_exist():
+    """Every path the analysis dirty check covers exists (a rename would silently drop coverage)."""
+    assert all((ROOT / path).exists() for path in ANALYSIS_PATHS)
 
 
 def test_settings_tolerate_last_bit_float_differences():

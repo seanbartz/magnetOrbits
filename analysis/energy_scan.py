@@ -37,9 +37,10 @@ Checks (analyze): +z/-z edge vs analytic on both branches; head-to-tail b_out/b_
 monotonically as E -> 0; b_out -> 2 monotonically as E -> infinity with (b_out^2 - 4) E settling to
 a constant; at the paper energy the head-to-tail edge equals the stage-5 value
 (tests/validated.py) and the map agrees with tests/reference/map_torus32.npz;
-provenance: every run clean and unmixed, the analysis tree clean, and the runtime code
+provenance: every run clean and unmixed, the analysis tree (runtime code plus ANALYSIS_PATHS)
+clean, and the runtime code
 (sweep.RUNTIME_PATHS) identical at every run's commit and at the analysis commit.
-Output: results/energy_scan/summary.json, figures/energy_scan_*.pdf.
+Output: results/energy_scan/summary.json, figures/energy_scan_*.pdf (plus .png previews, gitignored).
 """
 
 import json
@@ -105,7 +106,7 @@ def run_name(energy):
     return f"escan_E{energy:.6g}"
 
 
-def run(workers=18):
+def run(workers=min(18, os.cpu_count() or 1)):
     for energy in ENERGIES:
         s = sweep_settings(energy)
         meta_file = ROOT / "results" / run_name(energy) / "meta.json"
@@ -286,9 +287,14 @@ def provenance(rows, analysis_head, analysis_dirty):
     return not dirty and not analysis_dirty and not changed, detail
 
 
+# Everything the analysis reads besides the runtime code (sweep.RUNTIME_PATHS) and the runs.
+ANALYSIS_PATHS = ("analysis/energy_scan.py", "analysis/compare_maps.py", "tests/validated.py",
+                  "tests/reference/map_torus32.npz")
+
+
 def git_state():
     import sweep
-    return sweep.git_state(extra_paths=("analysis/energy_scan.py",))
+    return sweep.git_state(extra_paths=ANALYSIS_PATHS)
 
 
 def make_figures(rows):

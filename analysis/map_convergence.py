@@ -72,6 +72,13 @@ def compare_profile(prof, rec):
     return same, diff
 
 
+def non_negative_int(text):
+    value = int(text)
+    if value < 0:
+        raise argparse.ArgumentTypeError(f"must be >= 0, got {value}")
+    return value
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("result_dir")
@@ -81,8 +88,9 @@ def main():
     p.add_argument("--reference", action="store_true",
                    help="recompute with the scipy reference integrator instead of the run's own method "
                         "(an independent check; ~400x slower)")
-    p.add_argument("--n-reference", type=int, default=1,
-                   help="for a numba run: sample points also recomputed with scipy at the run's settings")
+    p.add_argument("--n-reference", type=non_negative_int, default=1,
+                   help="for a numba run: sample points also recomputed with scipy at the run's settings "
+                        "(0 turns the cross-check off)")
     args = p.parse_args()
 
     data = load_map(args.result_dir, expand_symmetry=False)
