@@ -120,6 +120,10 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   known result is reproduced. The full $32\times32$ map recomputed with it is identical to the
   scipy map (edges bit-for-bit). Speed: 0.29 ms vs 111 ms per trajectory (383x); the map takes
   6.7 s instead of 34 min on 18 workers.
+- **One-transition-per-scan-cell check, whole map** (stage 7 tooling): the $32\times32$ map redone
+  with a 4x finer $b$ scan (`n_scan` 800, 25 s with numba) has identical interval counts at all
+  1024 points and edges within $6.3\times10^{-7}$ of the production map
+  (`analysis/compare_maps.py ... --scan-refinement`): no hidden transitions at 4x resolution.
 
 ## Cost outlook
 

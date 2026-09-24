@@ -3,6 +3,7 @@
 Usage
 -----
     python analysis/compare_maps.py results/torus32_numba tests/reference/map_torus32.npz
+    python analysis/compare_maps.py results/torus32_scan800 tests/reference/map_torus32.npz --scan-refinement
 
 Pass criteria (stage 7): identical contact-interval counts at every grid point, identical nan
 patterns (a value missing in only one map fails), and outer edge and capture measure equal to
@@ -44,11 +45,15 @@ def max_rel_diff(a, b):
 
 
 def main():
-    new = load_map(sys.argv[1])
-    ref = np.load(sys.argv[2])
+    paths = [a for a in sys.argv[1:] if not a.startswith("--")]
+    new = load_map(paths[0])
+    ref = np.load(paths[1])
     ref_settings = json.loads(str(ref["settings"]))
-    new_settings = {k: v for k, v in new["meta"]["settings"].items() if k != "method"}
-    assert new_settings == {k: v for k, v in ref_settings.items() if k != "method"}, "different map settings"
+    # --scan-refinement: the new map may use a finer b scan (n_scan) than the reference; that is
+    # the whole-map test of the one-transition-per-scan-cell assumption (physics/edges.py).
+    ignore = {"method", "n_scan"} if "--scan-refinement" in sys.argv else {"method"}
+    new_settings = {k: v for k, v in new["meta"]["settings"].items() if k not in ignore}
+    assert new_settings == {k: v for k, v in ref_settings.items() if k not in ignore}, "different map settings"
     same_intervals = np.array_equal(new["n_intervals"], ref["n_intervals"])
     rel_edge = max_rel_diff(new["outer_edge"], ref["outer_edge"])
     rel_measure = max_rel_diff(new["capture_measure"], ref["capture_measure"])
