@@ -9,3 +9,4 @@ results/
 *.npz
 !tests/reference/*.npz
 *.log
+.DS_Store
