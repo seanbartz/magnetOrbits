@@ -84,7 +84,7 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   the edge depends steeply on orientation. At $\tilde E=0.0335$, $r_0=1000$ leaves edge errors up
   to $5\times10^{-4}$ (relative); orders 1.97–2.02 in $r_0$ confirmed to $6.4\times10^4$. Maps use
   $r_0=64000$ (residual $\le3\times10^{-7}$, +15% cost). `run_trajectory` default unchanged (1000).
-- **Paper discrepancy** (stage 5, open). Head-to-tail at $\tilde E=0.033501$: our collision
+- **Paper discrepancy** (stage 5; closed 2026-09-24 at the user's direction, not pursued further; the strict xfail stays as documentation). Head-to-tail at $\tilde E=0.033501$: our collision
   edge $b_c=5.75459$ (converged to $2\times10^{-8}$; single interval; $1.071\times$ the locked
   value 5.3729) vs. the paper's $4.65$. Ruled out: $r_0$, rtol, alignment with $\hat r$ at a
   finite start ($\ge5.66$ even at $8R$), and sticking vs. touching (first-bounce sticking
