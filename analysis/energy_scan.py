@@ -5,6 +5,7 @@ Usage
     python analysis/energy_scan.py run        # one symmetry-reduced 32 x 32 sweep per energy (numba)
     python analysis/energy_scan.py analyze    # checks, summary, figures
     python analysis/energy_scan.py all        # both
+    python analysis/energy_scan.py save-reference   # summary -> tests/reference/energy_scan.json
 
 Per energy E (ENERGIES, 1e-3 .. 10, log-spaced, incl. the paper energy and the crossovers):
   * results/escan_<k>/ : sweep.py --fundamental --n-phi 32 with the scan_settings(E) rules;
@@ -222,9 +223,23 @@ def make_figures(rows):
     plt.close(fig)
 
 
+def save_reference():
+    """Copy the summary to tests/reference/ only if every run and the analysis were clean."""
+    summary = json.loads((ROOT / "results" / "energy_scan" / "summary.json").read_text())
+    if summary["analysis_git_dirty"] or any(r["git_dirty"] for r in summary["rows"]):
+        raise SystemExit("energy-scan summary comes from dirty or mixed runs; rerun from committed code")
+    if not all(c["pass"] for c in summary["checks"]):
+        raise SystemExit("energy-scan checks did not all pass; not storing a reference")
+    out = ROOT / "tests" / "reference" / "energy_scan.json"
+    out.write_text(json.dumps(summary, indent=1))
+    print(f"wrote {out}")
+
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
     if mode in ("run", "all"):
         run()
     if mode in ("analyze", "all"):
         analyze()
+    if mode == "save-reference":
+        save_reference()
