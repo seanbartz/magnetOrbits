@@ -3,6 +3,7 @@
 Usage
 -----
     python analysis/band_scan.py strips          # 9a: mirror strips per energy (production + 4x b scan)
+    python analysis/band_scan.py slivers         # 16x b scan where the 4x scan moved b_out
     python analysis/band_scan.py exponents       # 9b: uncertainty exponents at band points + controls
     python analysis/band_scan.py analyze         # band measures, checks, summary, figures
     python analysis/band_scan.py all             # the three above
@@ -13,13 +14,20 @@ Strips (sweep.py --strip mirror; phi1 = s, phi2 = pi - s + d), per energy E in E
                               b_max = max(10, 2 b_c^locked), db ~ 0.05, r0 = max(1000, 64000 E_paper/E));
   * results/band_E<E>_scan4/  the same strip with a 4x finer b scan; band statistics use this run,
                               since thin windows sit below the production scan (stage 8c);
-  * results/band_E0.3_fine/   the closing check: 4x finer d step (pi/2048) and 4x b scan at E = 0.3.
+  * results/band_E0.35_fine/  the closing check: 4x finer d step (pi/2048), 16 rows including the
+                              corner rows, and the 4x b scan at E = 0.35.
   Along: s in [0, pi) in 32 rows (step pi/32; the other half of the closed line is the flip image).
   Across: step pi/2048 over [-pi/16, pi/64] for E < 0.02 (the band is narrow there), step pi/512
   over [-3pi/8, pi/8] otherwise. Both lattices contain the 32 x 32 torus points (check 5), and the
   wide one contains the stage-8c lattice (check 1). The ranges and the energies come from a
   one-row probe (s = pi/2, 4x scan, 2026-09-25): the band persists down to E = 0.002, moving toward
-  the mirror line, and closes between E = 0.25 and 0.28.
+  the mirror line, and closes between E = 0.25 and 0.28 at s = pi/2. A pocket in the rows near
+  s = 0, pi (head-to-head / tail-to-tail) survives to E = 0.3 and closes before 0.35 (probe of the
+  rows s = 0 and 15 pi/16 after the first strips).
+
+Slivers: where the 4x scan moves b_out, it finds a thin contact sliver above the production edge
+(b_out increases by ~1%, always next to window points). `slivers` recomputes those points with a
+16x scan (results/band_scan/slivers.json) to test whether the 4x b_out has converged.
 
 Band measures (analyze, from the 4x runs): per row s, the sharp edge (the largest jump of b_out
 between neighbouring d) and the d range of window points (n_intervals >= 2); per energy, the
@@ -59,8 +67,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from physics import central                                                      # noqa: E402
-from physics.edges import (capture_profile, completeness_problem, in_plane_moment,   # noqa: E402
-                           load_map, strip_angles)
+from physics.edges import (capture_profile, completeness, in_plane_moment,   # noqa: E402
+                           load_map, strip_angles, strip_point)
 from physics.fractal import (fit_exponent, outcome_codes, resolution_scaling,   # noqa: E402
                              sample_points, uncertain_counts)
 from tests.published.bartz_shaw_2022 import ENERGY_TILDE as E_PAPER             # noqa: E402
@@ -68,13 +76,14 @@ from tests.published.bartz_shaw_2022 import ENERGY_TILDE as E_PAPER             
 import energy_scan                                                               # noqa: E402
 import uncertainty                                                               # noqa: E402
 
-ENERGIES = [0.002, 0.005, 0.01, 0.02, E_PAPER, 0.0625, 0.125, 0.2, 0.25, 0.3]
-CLOSED_ENERGY, LAST_OPEN_ENERGY = 0.3, 0.25
+ENERGIES = [0.002, 0.005, 0.01, 0.02, E_PAPER, 0.0625, 0.125, 0.2, 0.25, 0.3, 0.35]
+CLOSED_ENERGY, LAST_OPEN_ENERGY = 0.35, 0.3
 ALONG = [0.0, 1.0, 32]
 NARROW = [-0.0625, 0.015625, 161]        # step pi/2048
 WIDE = [-0.375, 0.125, 257]              # step pi/512
-FINE_CLOSING = {"along_pi": [0.0, 1.0, 8], "across_pi": [-0.3125, -0.0625, 513]}   # step pi/2048
+FINE_CLOSING = {"along_pi": [0.0, 1.0, 16], "across_pi": [-0.3125, -0.0625, 513]}  # step pi/2048
 SCAN_FACTOR = 4
+SLIVER_FACTOR = 16
 EXPONENT_ROWS = (8, 16)                  # s = pi/4, pi/2
 SAMPLES, SEED = 50000, 20260925
 SCAN_SIZES = [51, 201, 801, 3201, 12801]
@@ -137,20 +146,68 @@ def run_strips(workers=min(18, os.cpu_count() or 1)):
         print(f"  [{time.time() - t0:.0f} s]", flush=True)
 
 
+MAX_UNRESOLVED_SHARE = 1e-3     # points with an undecided (timeout) range inside the band
+
+
 def load_run(name, energy, grid, settings):
-    """A strip run, validated: complete, matching its spec, every edge resolved inside the scan."""
+    """A strip run, validated: no missing or failed points, matching its spec, and every outer edge
+    resolved inside the scan.
+
+    Points with an undecided (timeout) range are allowed if they are rare (MAX_UNRESOLVED_SHARE):
+    the ranges are ~1e-5 wide, long-lived temporary captures in fractal structure. Their interval
+    count is unknown (n_intervals = -1), so band measures count them separately
+    (data["unresolved_points"]) instead of as windows; when the range sits at the outer edge itself,
+    b_out is unknown too (nan) and the comparisons skip or flag it.
+    """
     data = load_map(ROOT / "results" / name)
-    problem = completeness_problem(data) or spec_problem(data["meta"], grid, settings)
+    c = completeness(data)
+    problem = spec_problem(data["meta"], grid, settings)
+    if c["missing"] or c["failed"]:
+        problem = f"{len(c['missing'])} points missing, {len(c['failed'])} failed"
+    elif len(c["unresolved"]) > MAX_UNRESOLVED_SHARE * len(data["records"]):
+        problem = f"{len(c['unresolved'])} points with unresolved (timeout) ranges"
     if not problem:
-        bad = [k for k, r in data["records"].items() if r["outer_edge"] is None or r["contact_at_scan_top"]]
+        unresolved = set(c["unresolved"])
+        bad = [k for k, r in data["records"].items()
+               if r["contact_at_scan_top"] or (r["outer_edge"] is None and k not in unresolved)]
         problem = f"{len(bad)} points without an outer edge or colliding at b_max: {bad[:5]}" if bad else None
     if problem:
         raise SystemExit(f"{name}: {problem}")
+    data["unresolved_points"] = [list(k) for k in c["unresolved"]]
     return data
 
 
 def load_runs():
     return {name: load_run(name, e, g, s) for name, e, g, s in run_specs()}
+
+
+def sliver_job(args):
+    energy, i, j, grid, settings = args
+    rec = strip_point(energy, i, j, grid, settings)
+    return rec["outer_edge"], rec["n_intervals"]
+
+
+def run_slivers(workers=min(18, os.cpu_count() or 1)):
+    """16x b scan at every point where the 4x scan moved b_out (results/band_scan/slivers.json)."""
+    runs = load_runs()
+    head, dirty = git_state()
+    jobs, keys = [], []
+    for e in ENERGIES:
+        base, fine = runs[f"band_E{e:.6g}"], runs[f"band_E{e:.6g}_scan4"]
+        for i, j in scan_refinement(base, fine)["b_out_moved"]:
+            jobs.append((e, i, j, strip_grid(e), strip_settings(e, SLIVER_FACTOR)))
+            keys.append((e, i, j, fine["outer_edge"][i, j], base["outer_edge"][i, j]))
+    t0 = time.time()
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        results = list(pool.map(sliver_job, jobs))
+    points = [{"energy": e, "i": i, "j": j, "b_out_1x": float(b1), "b_out_4x": float(b4),
+               "b_out_16x": b16, "n_intervals_16x": n16}
+              for (e, i, j, b4, b1), (b16, n16) in zip(keys, results)]
+    RESULTS.mkdir(parents=True, exist_ok=True)
+    (RESULTS / "slivers.json").write_text(json.dumps({"points": points, "factor": SLIVER_FACTOR, "git_hash": head,
+                                                       "git_dirty": dirty}, indent=1))
+    same = sum(p["b_out_16x"] is not None and abs(p["b_out_16x"] / p["b_out_4x"] - 1) <= B_OUT_TOLERANCE for p in points)
+    print(f"{len(points)} points; 16x b_out equals 4x at {same}  [{time.time() - t0:.0f} s]")
 
 
 # ----------------------------------------------------------------------------------------------
@@ -165,8 +222,8 @@ def escape_windows(rec):
 
 def row_measures(outer_edge_row, n_intervals_row, across):
     """Sharp edge (d at the largest b_out jump, midpoint of the two cells), its size, window d range."""
-    jumps = np.abs(np.diff(outer_edge_row))
-    k = int(np.argmax(jumps))
+    jumps = np.abs(np.diff(outer_edge_row))          # nan next to an unresolved outer edge: ignored
+    k = int(np.nanargmax(jumps))
     win = n_intervals_row >= 2
     return {"sharp_edge": float((across[k] + across[k + 1]) / 2), "sharp_index": k, "jump": float(jumps[k]),
             "window_lo": float(across[win].min()) if win.any() else None,
@@ -195,10 +252,11 @@ def band_measures(data):
                                                                    max(r["sharp_edge"] for r in rows)],
         "window_lo": med("window_lo", with_win), "window_hi": med("window_hi", with_win),
         "n_window_points": int(win.sum()), "rows_with_windows": len(with_win),
+        "unresolved_points": data.get("unresolved_points", []),
         "torus_fraction": float(2 * win.sum() * ds * dd / (4 * np.pi ** 2)),
         "window_b_range": [min(w[0] for w in windows), max(w[1] for w in windows)] if windows else None,
         "windows_at_range_end": bool(win[:, 0].any() or win[:, -1].any()),
-        "b_out_min": float(np.min(data["outer_edge"])),
+        "b_out_min": float(np.nanmin(data["outer_edge"])),
     }
 
 
@@ -329,18 +387,39 @@ def compare_with_torus(strip, escan):
             continue
         n += 1
         mism += rec["n_intervals"] != escan["n_intervals"][a, b]
-        worst = max(worst, abs(rec["outer_edge"] / escan["outer_edge"][a, b] - 1))
+        new = np.nan if rec["outer_edge"] is None else rec["outer_edge"]
+        rel = abs(new / escan["outer_edge"][a, b] - 1)
+        worst = max(worst, 0.0 if np.isnan(new) and np.isnan(escan["outer_edge"][a, b]) else
+                    (np.inf if np.isnan(rel) else rel))
     return n, mism, worst
 
 
+B_OUT_TOLERANCE = 2e-6          # twice the bisection rel_tol
+MAX_UNCONVERGED_SHARE = 1e-3    # points whose outer edge itself lies in fractal structure
+
+
 def scan_refinement(base, fine):
-    """(max rel b_out change, rows whose sharp edge moved, points whose interval count changed)."""
-    rel = np.max(np.abs(fine["outer_edge"] / base["outer_edge"] - 1))
+    """How the 4x b scan changes a strip.
+
+    Returns max rel b_out change, the points where b_out moved by more than B_OUT_TOLERANCE (there
+    the outer edge itself lies in fractal structure: contact and escape alternate at every scan
+    resolution, so the edge found is the last transition the scan catches), the number of rows
+    whose sharp edge moved, and the number of points whose interval count changed.
+    """
+    rel = np.abs(fine["outer_edge"] / base["outer_edge"] - 1)
+    rel[np.isnan(fine["outer_edge"]) != np.isnan(base["outer_edge"])] = np.inf     # resolved in one run only
+    rel[np.isnan(fine["outer_edge"]) & np.isnan(base["outer_edge"])] = 0.0         # unresolved in both
     across = base["across"] / np.pi
     moved = sum(row_measures(base["outer_edge"][i], base["n_intervals"][i], across)["sharp_index"]
                 != row_measures(fine["outer_edge"][i], fine["n_intervals"][i], across)["sharp_index"]
                 for i in range(len(base["along"])))
-    return float(rel), int(moved), int(np.sum(base["n_intervals"] != fine["n_intervals"]))
+    unconverged = [[int(i), int(j)] for i, j in np.argwhere(rel > B_OUT_TOLERANCE)]
+    win = (base["n_intervals"] >= 2) | (fine["n_intervals"] >= 2)
+    sliver = [[i, j] for i, j in unconverged if win[i, max(j - 2, 0):j + 3].any()
+              and fine["outer_edge"][i, j] > base["outer_edge"][i, j]]
+    return {"max_rel_b_out": float(rel[np.isfinite(rel)].max()), "b_out_moved": unconverged,
+            "sliver": sliver, "points": int(rel.size),
+            "sharp_edge_rows_moved": int(moved), "interval_count_changed": int(np.sum(base["n_intervals"] != fine["n_intervals"]))}
 
 
 def compare_with_stage8(base):
@@ -352,7 +431,9 @@ def compare_with_stage8(base):
         if not (0 <= j8 < len(s8["across"])):
             continue
         assert abs(s8["along"][i8] - base["along"][i]) < 1e-12 and abs(s8["across"][j8] - base["across"][j]) < 1e-12
-        worst = max(worst, abs(rec["outer_edge"] / s8["outer_edge"][i8, j8] - 1)); n += 1
+        new = np.nan if rec["outer_edge"] is None else rec["outer_edge"]
+        rel = abs(new / s8["outer_edge"][i8, j8] - 1)
+        worst = max(worst, np.inf if np.isnan(rel) else rel); n += 1
     common = slice(96, 96 + len(s8["across"]))         # sharp edges compared over the common d range
     moved = sum(abs(row_measures(base["outer_edge"][i, common], base["n_intervals"][i, common],
                                  base["across"][common] / np.pi)["sharp_edge"]
@@ -385,7 +466,8 @@ def analyze():
               f"torus fraction {100 * m['torus_fraction']:.2f}%  min alpha {row['alpha_min_band']}", flush=True)
     fine_close = band_measures(runs[f"band_E{CLOSED_ENERGY:.6g}_fine"])
     head, dirty = git_state()
-    checks = run_checks(per_energy, runs, exps, fine_close, head, dirty)
+    slivers = json.loads((RESULTS / "slivers.json").read_text())
+    checks = run_checks(per_energy, runs, exps, slivers, fine_close, head, dirty)
     for name, ok, detail in checks:
         print(f"CHECK {name:30s} {'PASS' if ok else 'FAIL'}  {detail}")
     out = {"energies": ENERGIES, "per_energy": per_energy, "closing_fine": {k: v for k, v in fine_close.items() if k != "rows"},
@@ -416,7 +498,7 @@ def fits(per_energy):
                                  "energies": [r["energy"] for r in low]}}
 
 
-def run_checks(per_energy, runs, exps, fine_close, head, dirty):
+def run_checks(per_energy, runs, exps, slivers, fine_close, head, dirty):
     checks = []
     # (1) paper energy vs stage 8.
     n, worst, moved, _ = compare_with_stage8(runs[f"band_E{E_PAPER:.6g}"])
@@ -434,15 +516,29 @@ def run_checks(per_energy, runs, exps, fine_close, head, dirty):
     checks.append(("controls alpha = 1", not bad and len(ctrl) == 2 * len(per_energy),
                    f"{len(ctrl)} controls, alpha {min(v['alpha'] for *_, v in ctrl):.3f}-{max(v['alpha'] for *_, v in ctrl):.3f}; "
                    f"outside max(3 sigma, 0.05): {bad}"))
-    # (3) 4x scan.
-    rel = max(r["scan_refinement"][0] for r in per_energy)
-    moved = {r["energy"]: r["scan_refinement"][1] for r in per_energy if r["scan_refinement"][1]}
-    checks.append(("4x scan: b_out, sharp edge", rel < 2e-6 and not moved,
-                   f"max rel b_out change {rel:.1e}; energies with a moved sharp edge: {moved}"))
+    # (3) 4x scan: no row's sharp edge moves; b_out is unchanged except (a) next to window points,
+    # where the 4x scan finds a contact sliver above the production edge, and (b) rare points whose
+    # outer edge itself is fractal. The 16x scan must confirm the 4x b_out at the moved points,
+    # except for a small share (MAX_UNCONVERGED_SHARE of all points).
+    ref_ = [r["scan_refinement"] for r in per_energy]
+    n_points = sum(x["points"] for x in ref_)
+    n_moved = sum(len(x["b_out_moved"]) for x in ref_)
+    n_sliver = sum(len(x["sliver"]) for x in ref_)
+    rows_moved = {r["energy"]: r["scan_refinement"]["sharp_edge_rows_moved"] for r in per_energy
+                  if r["scan_refinement"]["sharp_edge_rows_moved"]}
+    unconfirmed = [(p["energy"], p["i"], p["j"]) for p in slivers["points"]
+                   if p["b_out_16x"] is None or abs(p["b_out_16x"] / p["b_out_4x"] - 1) > B_OUT_TOLERANCE]
+    covered = len(slivers["points"]) == n_moved
+    checks.append(("4x scan: b_out, sharp edge", not rows_moved and covered
+                   and len(unconfirmed) <= MAX_UNCONVERGED_SHARE * n_points,
+                   f"b_out moved by > {B_OUT_TOLERANCE:.0e} at {n_moved}/{n_points} points ({n_sliver} contact slivers "
+                   f"next to windows, {n_moved - n_sliver} other); 16x confirms the 4x b_out at "
+                   f"{len(slivers['points']) - len(unconfirmed)}/{len(slivers['points'])} (not at {unconfirmed}); "
+                   f"rows with a moved sharp edge: {rows_moved}"))
     # (4) closing.
     open_ = next(r for r in per_energy if r["energy"] == LAST_OPEN_ENERGY)
     closed = next(r for r in per_energy if r["energy"] == CLOSED_ENERGY)
-    checks.append(("band closes by E = 0.3", fine_close["n_window_points"] == 0 and closed["n_window_points"] == 0
+    checks.append((f"band closes by E = {CLOSED_ENERGY}", fine_close["n_window_points"] == 0 and closed["n_window_points"] == 0
                    and open_["n_window_points"] > 0,
                    f"window points: {open_['n_window_points']} at E = {LAST_OPEN_ENERGY}, {closed['n_window_points']} at "
                    f"{CLOSED_ENERGY}, {fine_close['n_window_points']} on the pi/2048 grid at {CLOSED_ENERGY}"))
@@ -459,15 +555,16 @@ def run_checks(per_energy, runs, exps, fine_close, head, dirty):
     # Range, and provenance.
     at_end = [r["energy"] for r in per_energy if r["windows_at_range_end"]]
     checks.append(("band inside the d range", not at_end, f"energies with windows at a range end: {at_end}"))
-    checks.append(("provenance", *provenance(runs, exps, head, dirty)))
+    checks.append(("provenance", *provenance(runs, exps, slivers, head, dirty)))
     return checks
 
 
-def provenance(runs, exps, head, dirty):
+def provenance(runs, exps, slivers, head, dirty):
     import sweep
     run_dirty = [n for n, d in runs.items() if d["meta"]["git_dirty"] or d["meta"].get("git_mixed", False)]
-    exp_dirty = sorted({k for k, v in exps.items() if v["git_dirty"]})
-    hashes = sorted({d["meta"]["git_hash"] for d in runs.values()} | {v["git_hash"] for v in exps.values()})
+    exp_dirty = sorted({k for k, v in exps.items() if v["git_dirty"]}) + (["slivers"] if slivers["git_dirty"] else [])
+    hashes = sorted({d["meta"]["git_hash"] for d in runs.values()} | {v["git_hash"] for v in exps.values()}
+                    | {slivers["git_hash"]})
     changed = [h[:8] for h in hashes
                if subprocess.run(["git", "diff", "--quiet", h, head, "--", *sweep.RUNTIME_PATHS],
                                  cwd=ROOT, stderr=subprocess.DEVNULL).returncode != 0]
@@ -559,6 +656,8 @@ if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
     if mode in ("strips", "all"):
         run_strips()
+    if mode in ("slivers", "all"):
+        run_slivers()
     if mode in ("exponents", "all"):
         run_exponents()
     if mode in ("analyze", "all"):
