@@ -5,6 +5,7 @@ Usage
     python analysis/band_scan.py strips          # 9a: mirror strips per energy (production + 4x b scan)
     python analysis/band_scan.py slivers         # 16x b scan where the 4x scan moved b_out
     python analysis/band_scan.py exponents       # 9b: uncertainty exponents at band points + controls
+    python analysis/band_scan.py numerics        # tightened-numerics recount at the anti-line point
     python analysis/band_scan.py analyze         # band measures, checks, summary, figures
     python analysis/band_scan.py all             # the three above
     python analysis/band_scan.py save-reference  # summary + band maps -> tests/reference/
@@ -36,13 +37,17 @@ the windows occupy. Window counts are lower bounds (thin windows below the scan 
 
 Exponents (physics.fractal, as in analysis/uncertainty.py): at up to two band points on each of
 the rows s = pi/4 and pi/2 of the 4x run (the window point with the most edges, and the window
-point at the median d), the b interval spanning that point's windows plus a margin; and two
-smooth-edge controls per energy (+z/-z around the analytic b_c; the antiparallel line at s = pi/4
-around its outer edge). At the paper energy the stage-8 points band_A and band_B are recomputed
-with the stage-8 settings and seed, which must reproduce the stored counts exactly (check 1).
+point at the median d), the b interval spanning that point's windows plus a margin; the +z/-z
+control around the analytic b_c (one smooth edge: alpha = 1); and the antiparallel line at
+s = pi/4 around its outer edge. The latter was meant as a second control, but the antiparallel
+family, though invariant, is not integrable: at low energy its outer edge carries fine structure
+(alpha < 1), so it is reported as a result ("anti_line"), and `numerics` recounts it with rtol
+1e-12 and 2 r0. At the paper energy the stage-8 points band_A and band_B are recomputed with the
+stage-8 settings and seed, which must reproduce the stored counts exactly (check 1).
 
 Checks (analyze): (1) paper energy: sharp edges and b_out match the stage-8c strip, stage-8
-counts reproduced; (2) controls alpha = 1 at every energy; (3) b_out and the sharp edge unchanged
+counts reproduced; (2) +z/-z alpha = 1 at every energy, and the anti-line counts are unchanged by
+tightened numerics; (3) b_out and the sharp edge unchanged
 under the 4x scan; (4) no windows at E = 0.3 on the finer d grid, windows at 0.25; (5) strip points
 on the 32 x 32 grid match the stage-6a maps; plus completeness and provenance.
 Output: results/band_scan/{exponents,summary}.json, figures/band_scan_*.pdf.
@@ -367,6 +372,50 @@ def run_exponents(workers=min(18, os.cpu_count() or 1)):
                       f"+- {res['alpha_err']:.3f}  [{time.time() - t0:.0f} s]", flush=True)
 
 
+NUMERICS_ENERGY = 0.002
+NUMERICS_EPS = [1e-4, 1e-5, 1e-6]
+
+
+def run_numerics(workers=min(18, os.cpu_count() or 1), samples=20000, seed=11):
+    """Recount the anti-line point at NUMERICS_ENERGY with tightened numerics (same samples).
+
+    The antiparallel family is invariant but not integrable; at low energy its outer edge carries
+    fine structure (alpha < 1). If that structure is dynamical, rtol 1e-12 and a doubled r0 give
+    Poisson-consistent uncertain counts (individual near-boundary outcomes may flip); if integration
+    error decided outcomes, tightening would change the counts systematically.
+    """
+    store = json.loads((RESULTS / "exponents.json").read_text())["points"]
+    point = store[f"{NUMERICS_ENERGY:.6g}/control_anti"]
+    base = {"start_radius": energy_scan.scan_settings(NUMERICS_ENERGY)["start_radius"], "method": "numba"}
+    variants = {"production": {}, "rtol 1e-12": {"rtol": 1e-12, "atol": 1e-14},
+                "2 r0": {"start_radius": 2 * base["start_radius"]}}
+    m1, m2 = moments(point)
+    centers, eps, b_all = sample_points(point["b_lo"], point["b_hi"], NUMERICS_EPS, samples, seed)
+    chunks = np.array_split(b_all, 4 * workers)
+    head, dirty = git_state()
+    out = {"energy": NUMERICS_ENERGY, "point": "control_anti", "b_lo": point["b_lo"], "b_hi": point["b_hi"],
+           "eps": eps.tolist(), "samples": samples, "seed": seed, "variants": {}, "git_hash": head, "git_dirty": dirty}
+    center_codes = {}
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        for label, override in variants.items():
+            codes = "".join(pool.map(codes_job, [(NUMERICS_ENERGY, m1, m2, c, {**base, **override}) for c in chunks]))
+            rows = uncertain_counts(codes, len(centers), eps)
+            center_codes[label] = codes[:len(centers)]
+            out["variants"][label] = {"uncertain": [r[0] for r in rows], "totals": [r[1] for r in rows]}
+    for label, v in out["variants"].items():
+        v["center_outcomes_changed"] = sum(a != b for a, b in zip(center_codes[label], center_codes["production"]))
+        print(f"numerics {label:11s}: uncertain {v['uncertain']} of {v['totals'][0]}; "
+              f"center outcomes changed vs production: {v['center_outcomes_changed']}")
+    (RESULTS / "numerics.json").write_text(json.dumps(out, indent=1))
+
+
+def numerics_consistent(numerics):
+    """Every variant's uncertain count within 4 Poisson sigma of production, at every eps."""
+    prod = numerics["variants"]["production"]["uncertain"]
+    return all(abs(a - b) <= 4 * np.sqrt(a + b + 1) for v in numerics["variants"].values()
+               for a, b in zip(v["uncertain"], prod))
+
+
 # ----------------------------------------------------------------------------------------------
 # Analysis and checks
 # ----------------------------------------------------------------------------------------------
@@ -454,7 +503,7 @@ def analyze():
         row = {"energy": e, **{k: v for k, v in m.items() if k != "rows"}, "rows": m["rows"],
                "production_windows": int(np.sum(base["n_intervals"] >= 2)),
                "scan_refinement": scan_refinement(base, fine),
-               "exponents": {k: exponent_summary(v) for k, v in pts.items()},
+               "exponents": {k: exponent_summary(k, v) for k, v in pts.items()},
                "alpha_min_band": min(band_alphas) if band_alphas else None,
                "git_hashes": sorted({runs[n]["meta"]["git_hash"] for n in (f"band_E{e:.6g}", f"band_E{e:.6g}_scan4")}),
                "git_dirty": any(runs[n]["meta"]["git_dirty"] or runs[n]["meta"].get("git_mixed", False)
@@ -467,7 +516,8 @@ def analyze():
     fine_close = band_measures(runs[f"band_E{CLOSED_ENERGY:.6g}_fine"])
     head, dirty = git_state()
     slivers = json.loads((RESULTS / "slivers.json").read_text())
-    checks = run_checks(per_energy, runs, exps, slivers, fine_close, head, dirty)
+    numerics = json.loads((RESULTS / "numerics.json").read_text())
+    checks = run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirty)
     for name, ok, detail in checks:
         print(f"CHECK {name:30s} {'PASS' if ok else 'FAIL'}  {detail}")
     out = {"energies": ENERGIES, "per_energy": per_energy, "closing_fine": {k: v for k, v in fine_close.items() if k != "rows"},
@@ -480,9 +530,16 @@ def analyze():
         raise SystemExit(1)
 
 
-def exponent_summary(v):
-    """The stored fields of one exponent point that the summary keeps."""
+def exponent_summary(name, v):
+    """The stored fields of one exponent point that the summary keeps.
+
+    The antiparallel-line point was run as a second smooth-edge control, but at low energy its
+    outer edge carries fine structure (the invariant family is not integrable), so the summary
+    reports it as its own kind, "anti_line"; only +z/-z is a control.
+    """
     out = {f: v[f] for f in ("alpha", "alpha_err", "b_lo", "b_hi", "kind")}
+    if name == "control_anti":
+        out["kind"] = "anti_line"
     out.update({f: v[f] for f in ("s_pi", "d_pi") if f in v})
     if "resolution" in v:
         out["resolution"] = [{f: r[f] for f in ("db", "n_edges", "capture_measure")} for r in v["resolution"]]
@@ -498,7 +555,7 @@ def fits(per_energy):
                                  "energies": [r["energy"] for r in low]}}
 
 
-def run_checks(per_energy, runs, exps, slivers, fine_close, head, dirty):
+def run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirty):
     checks = []
     # (1) paper energy vs stage 8.
     n, worst, moved, _ = compare_with_stage8(runs[f"band_E{E_PAPER:.6g}"])
@@ -510,12 +567,18 @@ def run_checks(per_energy, runs, exps, slivers, fine_close, head, dirty):
     checks.append(("stage-8 exponents reproduced", all(same.values()),
                    ", ".join(f"{p}: alpha {exps[f'{E_PAPER:.6g}/stage8_{p}']['alpha']:.3f} vs {ref[p]['alpha']:.3f}, "
                              f"counts identical {ok}" for p, ok in same.items())))
-    # (2) controls.
+    # (2) the +z/-z control (one analytic smooth edge) gives alpha = 1 at every energy; the
+    # anti-line structure at low energy survives tightened numerics.
     ctrl = [(r["energy"], k, v) for r in per_energy for k, v in r["exponents"].items() if v["kind"] == "control"]
     bad = [(e, k, round(v["alpha"], 3)) for e, k, v in ctrl if not abs(v["alpha"] - 1) <= max(3 * v["alpha_err"], 0.05)]
-    checks.append(("controls alpha = 1", not bad and len(ctrl) == 2 * len(per_energy),
+    checks.append(("+z/-z control alpha = 1", not bad and len(ctrl) == len(per_energy),
                    f"{len(ctrl)} controls, alpha {min(v['alpha'] for *_, v in ctrl):.3f}-{max(v['alpha'] for *_, v in ctrl):.3f}; "
                    f"outside max(3 sigma, 0.05): {bad}"))
+    variants = numerics["variants"]
+    checks.append(("anti-line structure is dynamical", numerics_consistent(numerics),
+                   f"E = {numerics['energy']}: uncertain counts " + "; ".join(
+                       f"{k} {v['uncertain']}" for k, v in variants.items())
+                   + f" of {variants['production']['totals'][0]} (within 4 sigma of production)"))
     # (3) 4x scan: no row's sharp edge moves; b_out is unchanged except (a) next to window points,
     # where the 4x scan finds a contact sliver above the production edge, and (b) rare points whose
     # outer edge itself is fractal. The 16x scan must confirm the 4x b_out at the moved points,
@@ -555,16 +618,17 @@ def run_checks(per_energy, runs, exps, slivers, fine_close, head, dirty):
     # Range, and provenance.
     at_end = [r["energy"] for r in per_energy if r["windows_at_range_end"]]
     checks.append(("band inside the d range", not at_end, f"energies with windows at a range end: {at_end}"))
-    checks.append(("provenance", *provenance(runs, exps, slivers, head, dirty)))
+    checks.append(("provenance", *provenance(runs, exps, slivers, numerics, head, dirty)))
     return checks
 
 
-def provenance(runs, exps, slivers, head, dirty):
+def provenance(runs, exps, slivers, numerics, head, dirty):
     import sweep
     run_dirty = [n for n, d in runs.items() if d["meta"]["git_dirty"] or d["meta"].get("git_mixed", False)]
-    exp_dirty = sorted({k for k, v in exps.items() if v["git_dirty"]}) + (["slivers"] if slivers["git_dirty"] else [])
+    exp_dirty = (sorted({k for k, v in exps.items() if v["git_dirty"]}) + (["slivers"] if slivers["git_dirty"] else [])
+                 + (["numerics"] if numerics["git_dirty"] else []))
     hashes = sorted({d["meta"]["git_hash"] for d in runs.values()} | {v["git_hash"] for v in exps.values()}
-                    | {slivers["git_hash"]})
+                    | {slivers["git_hash"], numerics["git_hash"]})
     changed = [h[:8] for h in hashes
                if subprocess.run(["git", "diff", "--quiet", h, head, "--", *sweep.RUNTIME_PATHS],
                                  cwd=ROOT, stderr=subprocess.DEVNULL).returncode != 0]
@@ -601,10 +665,11 @@ def make_figures(summary, runs):
     ax1.set_xlabel(r"$\tilde E$"); ax1.set_ylabel(r"distance below the mirror line, $-d/\pi$"); ax1.legend(fontsize=11)
     ax2.semilogx(E, [100 * r["torus_fraction"] for r in rows], "ko-", mfc="none")
     ax2.set_xlabel(r"$\tilde E$"); ax2.set_ylabel("share of orientations with windows (%)")
-    for k, kind in (("band", "C3"), ("control", "C0")):
+    for k, color, label in (("band", "C3", "mirror-band points"), ("anti_line", "C1", r"antiparallel line, $s=\pi/4$"),
+                            ("control", "C0", r"$+z/-z$ control (smooth edge)")):
         pts = [(r["energy"], v) for r in rows for v in r["exponents"].values() if v["kind"] == k]
         ax3.errorbar([e for e, _ in pts], [1 - v["alpha"] for _, v in pts], yerr=[v["alpha_err"] for _, v in pts],
-                     fmt="o", color=kind, mfc="none", label="band points" if k == "band" else "smooth-edge controls")
+                     fmt="o", color=color, mfc="none", label=label)
     ax3.set_xscale("log"); ax3.axhline(0, color="0.5", lw=1)
     ax3.set_xlabel(r"$\tilde E$"); ax3.set_ylabel(r"uncertainty dimension $D=1-\alpha$"); ax3.legend(fontsize=11)
     fig.tight_layout()
@@ -660,6 +725,8 @@ if __name__ == "__main__":
         run_slivers()
     if mode in ("exponents", "all"):
         run_exponents()
+    if mode in ("numerics", "all"):
+        run_numerics()
     if mode in ("analyze", "all"):
         analyze()
     if mode == "save-reference":
