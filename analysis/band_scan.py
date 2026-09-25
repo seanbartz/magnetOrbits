@@ -6,6 +6,7 @@ Usage
     python analysis/band_scan.py slivers         # 16x b scan where the 4x scan moved b_out
     python analysis/band_scan.py exponents       # 9b: uncertainty exponents at band points + controls
     python analysis/band_scan.py numerics        # tightened-numerics recount at the anti-line point
+    python analysis/band_scan.py survey          # exponents at window points spread across the band
     python analysis/band_scan.py analyze         # band measures, checks, summary, figures
     python analysis/band_scan.py all             # the three above
     python analysis/band_scan.py save-reference  # summary + band maps -> tests/reference/
@@ -90,6 +91,8 @@ FINE_CLOSING = {"along_pi": [0.0, 1.0, 16], "across_pi": [-0.3125, -0.0625, 513]
 SCAN_FACTOR = 4
 SLIVER_FACTOR = 16
 EXPONENT_ROWS = (8, 16)                  # s = pi/4, pi/2
+SURVEY_PER_ROW, SURVEY_SAMPLES = 6, 20000
+FRACTAL_ALPHA = 0.8                      # survey points with alpha below this count as fractal
 SAMPLES, SEED = 50000, 20260925
 SCAN_SIZES = [51, 201, 801, 3201, 12801]
 RESULTS = ROOT / "results" / "band_scan"
@@ -284,15 +287,53 @@ def band_points(data):
         for label, j in (("most_edges", most), ("median_d", median)):
             if any(p["i"] == i and p["j"] == j for p in points.values()):
                 continue
-            rec = data["records"][(i, j)]
-            wins = escape_windows(rec)
-            lo, hi = min(w[0] for w in wins), max(w[1] for w in wins)
-            pad = max(0.02, 0.5 * (hi - lo))
-            points[f"band_s{data['along'][i] / np.pi:.2f}_{label}"] = {
-                "i": i, "j": j, "s_pi": float(data["along"][i] / np.pi), "d_pi": float(data["across"][j] / np.pi),
-                "phi1": rec["phi1"], "phi2": rec["phi2"], "b_lo": float(max(lo - pad, 0.01)), "b_hi": float(hi + pad),
-                "n_edges_4x": len(rec["edges"]), "kind": "band"}
+            points[f"band_s{data['along'][i] / np.pi:.2f}_{label}"] = window_point(data, i, j, "band")
     return points
+
+
+def window_point(data, i, j, kind):
+    """Exponent point at strip point (i, j): the b interval spanning its escape windows, widened by
+    max(0.02, half their span) on both sides."""
+    rec = data["records"][(i, j)]
+    wins = escape_windows(rec)
+    lo, hi = min(w[0] for w in wins), max(w[1] for w in wins)
+    pad = max(0.02, 0.5 * (hi - lo))
+    return {"i": i, "j": j, "s_pi": float(data["along"][i] / np.pi), "d_pi": float(data["across"][j] / np.pi),
+            "phi1": rec["phi1"], "phi2": rec["phi2"], "b_lo": float(max(lo - pad, 0.01)), "b_hi": float(hi + pad),
+            "n_edges_4x": len(rec["edges"]), "kind": kind}
+
+
+def survey_points(data):
+    """SURVEY_PER_ROW window points per EXPONENT_ROWS row, evenly spread over the row's window d range."""
+    points = {}
+    for i in EXPONENT_ROWS:
+        js = [j for j in range(len(data["across"])) if data["n_intervals"][i, j] >= 2 and escape_windows(data["records"][(i, j)])]
+        for k in sorted({int(round(x)) for x in np.linspace(0, len(js) - 1, min(SURVEY_PER_ROW, len(js)))}):
+            j = js[k]
+            points[f"survey_s{data['along'][i] / np.pi:.2f}_d{data['across'][j] / np.pi:+.4f}"] = window_point(data, i, j, "survey")
+    return points
+
+
+def run_survey(workers=min(18, os.cpu_count() or 1)):
+    """Exponents at survey points of every energy with windows (resumable: results/band_scan/survey.json)."""
+    path = RESULTS / "survey.json"
+    head, dirty = git_state()
+    store = json.loads(path.read_text()) if path.exists() else {"points": {}}
+    store.setdefault("runs", []).append({"git_hash": head, "git_dirty": dirty, "at": time.strftime("%Y-%m-%d %H:%M:%S")})
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        for energy in ENERGIES:
+            settings = {"start_radius": energy_scan.scan_settings(energy)["start_radius"], "method": "numba"}
+            data = load_run(f"band_E{energy:.6g}_scan4", energy, strip_grid(energy), strip_settings(energy, SCAN_FACTOR))
+            for name, point in survey_points(data).items():
+                key = f"{energy:.6g}/{name}"
+                if key in store["points"]:
+                    continue
+                t0 = time.time()
+                res = exponent(pool, workers, energy, point, settings, samples=SURVEY_SAMPLES)
+                store["points"][key] = {**res, "energy": energy, "settings": settings, "git_hash": head, "git_dirty": dirty}
+                path.write_text(json.dumps(store, indent=1))
+                print(f"{key:40s} [{point['b_lo']:.4f}, {point['b_hi']:.4f}]  alpha = {res['alpha']:.3f} "
+                      f"+- {res['alpha_err']:.3f}  [{time.time() - t0:.0f} s]", flush=True)
 
 
 def control_points(energy, settings):
@@ -727,6 +768,8 @@ if __name__ == "__main__":
         run_exponents()
     if mode in ("numerics", "all"):
         run_numerics()
+    if mode in ("survey", "all"):
+        run_survey()
     if mode in ("analyze", "all"):
         analyze()
     if mode == "save-reference":
