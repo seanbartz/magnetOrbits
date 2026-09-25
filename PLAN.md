@@ -147,6 +147,29 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
     diagonal of the $32\times32$ grid).
   - Resolution: $2r_0$, rtol $10^{-12}$ and a 2x scan change the maps by $\le7.7\times10^{-7}$ at
     $\tilde E=10^{-3}$, $0.0335$ and 10; orientation-grid error $\le0.8\%$.
+- [ ] **9. The fractal window band vs. energy** (proposed 2026-09-25; in-plane orientations).
+  *Question:* how do the extent and the fractal dimension of the escape-window band depend on
+  $\tilde E$? At the paper energy the band is $-0.075\pi\lesssim d\lesssim0$ below the mirror line, with a
+  sharp low-$d$ edge, a ragged high-$d$ side and $D\approx0.65$–$0.73$ (8c, 8f). The $32\times32$ maps
+  (6a) show windows only for $0.02\lesssim\tilde E\lesssim0.2$, but the 3.1% plateau there is one grid
+  diagonal, so the grid cannot say how wide the band is, where it opens and closes, or whether
+  either end is tied to the locked-law crossovers $\tilde E=1/16$ (barrier to contact) and $1/8$.
+  - [ ] **9a. Mirror strips across energy:** the 8c strip (`sweep.py --strip mirror`, $d$ step
+    $\pi/512$) at about 8 energies spanning $0.01$–$0.3$, denser near the ends of the window range,
+    with $b_{\max}$ and $r_0$ from the 6a scaling rules. Outputs per energy: band edges in $d$ (the
+    sharp edge and the extent of the ragged side), band area on the torus, fraction of orientations
+    with windows, and the $b$ range the windows occupy.
+  - [ ] **9b. Uncertainty exponent across energy:** `analysis/uncertainty.py` at band points of each
+    strip, plus the two smooth-edge controls ($+z/-z$ and a point on the antiparallel line) at every
+    energy. Output: $\alpha(\tilde E)$ and $D=1-\alpha$, and the capture measure's scan convergence (is
+    the boundary still a fat fractal?).
+  - [ ] **9c. Notebook section** with the band extent and $D$ against $\tilde E$.
+  *Checks:* (1) at $\tilde E=0.0335$ the strip and the exponents reproduce 8c/8f (band edge
+  $d\approx-0.075\pi$; $\alpha=0.351$, $0.266$ at the stored points); (2) the controls give $\alpha\approx1$
+  at every energy; (3) the band's sharp edge and $b_{\rm out}$ agree to $\lesssim10^{-6}$ under a 4x $b$
+  scan (interval counts are not expected to converge inside the band); (4) where the band closes,
+  a finer $d$ step ($\pi/2048$) confirms it is gone rather than narrower than the grid; (5) the
+  strip points that lie on the $32\times32$ grid match the 6a maps.
 
 ## Findings so far
 
