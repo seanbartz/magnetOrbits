@@ -703,7 +703,7 @@ def make_figures(summary, runs):
     rows = summary["per_energy"]
     E = np.array([r["energy"] for r in rows])
     fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(24, 5))
-    op = [r for r in rows if r["n_window_points"]]
+    op = [r for r in rows if r["rows_with_windows"] == len(r["rows"])]      # the band spans every row
     ax1.loglog(E, [-r["sharp_edge"] for r in rows], "ko-", mfc="none", label="sharp edge")
     ax1.fill_between([r["energy"] for r in op], [-r["window_hi"] for r in op], [-r["window_lo"] for r in op],
                      color="C2", alpha=0.25, label="window points (median over s)")

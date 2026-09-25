@@ -50,6 +50,7 @@ analysis/map_checks.py   full-torus symmetry check + map figures           (stag
 sweep.py --strip {antiparallel,mirror,box}   zoomed strips / patches        (stage 8)
 physics/fractal.py   uncertainty exponent, resolution scaling               (stage 8)
 analysis/energy_scan.py   collision edge vs energy (maps per energy)     (stage 6a)
+analysis/band_scan.py     window band vs energy: mirror strips, exponents  (stage 9)
 analysis/uncertainty.py, strip_maps.py, run_strips.sh, run_corner.sh,
   save_zoom_reference.py   stage-8 runs, figures, stored references         (stage 8)
 physics/fast.py   compiled DOP853 + events + in-state quadrature;
