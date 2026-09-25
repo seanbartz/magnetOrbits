@@ -86,6 +86,14 @@ def sweep_settings(energy):
             "rel_tol": REL_TOL, "start_radius": cfg["start_radius"], "method": "numba"}
 
 
+def same_settings(have, want):
+    """Same keys; floats equal to rel 1e-12 (fractional powers may differ in the last bit across
+    platforms), everything else exactly equal."""
+    return set(want) == set(have) and all(
+        np.isclose(have[k], v, rtol=1e-12, atol=0.0) if isinstance(v, float) else have[k] == v
+        for k, v in want.items())
+
+
 def settings_problem(meta, energy):
     """Why a run's meta.json does not match this scan's settings for this energy, or None.
 
@@ -93,10 +101,7 @@ def settings_problem(meta, energy):
     the last bit between platforms); everything else must be equal.
     """
     want, have = sweep_settings(energy), meta["settings"]
-    same = set(want) == set(have) and all(
-        np.isclose(have[k], v, rtol=1e-12, atol=0.0) if isinstance(v, float) else have[k] == v
-        for k, v in want.items())
-    if same and meta["n_phi"] == N_PHI and meta.get("fundamental"):
+    if same_settings(have, want) and meta["n_phi"] == N_PHI and meta.get("fundamental"):
         return None
     return (f"settings {have} (n_phi {meta['n_phi']}, fundamental {meta.get('fundamental')}) differ from "
             f"this scan's {want}")
