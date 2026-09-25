@@ -7,7 +7,8 @@ Checks
 * escape windows are read from edge lists ('ce' followed by 'ec'), not from interval counts;
 * row measures: the sharp edge is the largest b_out jump, the window range spans n_intervals >= 2;
 * band points: the most-edges and median-d window points on the exponent rows, with intervals
-  that contain their windows;
+  that contain their windows; survey points spread over each row's window d range;
+* the numerics-consistency rule accepts Poisson-scale differences and rejects systematic ones;
 * torus_index recognizes grid angles (mod 2 pi) and rejects off-grid ones;
 * regression: 4x-scan strip points recomputed at two energies equal tests/reference/band_maps.npz.
 """
@@ -23,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "analysis"))
 
 from band_scan import (EXPONENT_ROWS, NARROW, WIDE, band_measures, band_points, escape_windows,   # noqa: E402
-                       row_measures, strip_grid, torus_index)
+                       numerics_consistent, row_measures, strip_grid, survey_points, torus_index)
 from physics.edges import strip_axes, strip_point                                                 # noqa: E402
 
 REFERENCE = ROOT / "tests" / "reference" / "band_maps.npz"
@@ -86,6 +87,20 @@ def test_band_points_choose_most_edges_and_median():
         assert p["j"] == 5                        # most edges (5) and the median of [4, 5, 7] coincide
         assert p["b_lo"] < 1.0 and p["b_hi"] > 1.3
     assert len(pts) == len(EXPONENT_ROWS)
+
+
+def test_survey_points_spread_over_the_window_range():
+    pts = survey_points(synthetic_strip())
+    for i in EXPONENT_ROWS:
+        row = sorted(p["j"] for p in pts.values() if p["i"] == i)
+        assert row == [4, 5, 7]                   # all three window points (fewer than SURVEY_PER_ROW)
+    assert all(p["kind"] == "survey" and p["b_lo"] < 1.0 for p in pts.values())
+
+
+def test_numerics_consistency_rule():
+    ok = {"variants": {"production": {"uncertain": [58, 69, 55]}, "tight": {"uncertain": [61, 56, 59]}}}
+    bad = {"variants": {"production": {"uncertain": [58, 69, 55]}, "tight": {"uncertain": [120, 140, 110]}}}
+    assert numerics_consistent(ok) and not numerics_consistent(bad)
 
 
 def test_band_measures_area_and_b_range():

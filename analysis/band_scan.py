@@ -535,17 +535,23 @@ def compare_with_stage8(base):
 def analyze():
     runs = load_runs()
     exps = json.loads((RESULTS / "exponents.json").read_text())["points"]
+    survey = json.loads((RESULTS / "survey.json").read_text())["points"]
     per_energy = []
     for e in ENERGIES:
         base, fine = runs[f"band_E{e:.6g}"], runs[f"band_E{e:.6g}_scan4"]
         m = band_measures(fine)
         pts = {k.split("/", 1)[1]: v for k, v in exps.items() if k.split("/", 1)[0] == f"{e:.6g}"}
         band_alphas = [v["alpha"] for k, v in pts.items() if v["kind"] == "band"]
+        surv = {k.split("/", 1)[1]: v for k, v in survey.items() if k.split("/", 1)[0] == f"{e:.6g}"}
+        surv_alpha = [v["alpha"] for v in surv.values()]
         row = {"energy": e, **{k: v for k, v in m.items() if k != "rows"}, "rows": m["rows"],
                "production_windows": int(np.sum(base["n_intervals"] >= 2)),
                "scan_refinement": scan_refinement(base, fine),
                "exponents": {k: exponent_summary(k, v) for k, v in pts.items()},
                "alpha_min_band": min(band_alphas) if band_alphas else None,
+               "survey": {k: exponent_summary(k, v) for k, v in surv.items()},
+               "survey_fractal_share": (sum(a < FRACTAL_ALPHA for a in surv_alpha) / len(surv_alpha)) if surv_alpha else None,
+               "survey_alpha_min": min(surv_alpha) if surv_alpha else None,
                "git_hashes": sorted({runs[n]["meta"]["git_hash"] for n in (f"band_E{e:.6g}", f"band_E{e:.6g}_scan4")}),
                "git_dirty": any(runs[n]["meta"]["git_dirty"] or runs[n]["meta"].get("git_mixed", False)
                                 for n in (f"band_E{e:.6g}", f"band_E{e:.6g}_scan4"))}
@@ -553,12 +559,13 @@ def analyze():
         print(f"E {e:<9.4g} sharp edge {m['sharp_edge']:+.4f}pi  windows d in "
               f"[{m['window_lo'] if m['window_lo'] is not None else float('nan'):+.4f}, "
               f"{m['window_hi'] if m['window_hi'] is not None else float('nan'):+.4f}]pi  "
-              f"torus fraction {100 * m['torus_fraction']:.2f}%  min alpha {row['alpha_min_band']}", flush=True)
+              f"torus fraction {100 * m['torus_fraction']:.2f}%  min alpha {row['alpha_min_band']}  "
+              f"survey: {row['survey_fractal_share']} fractal, min alpha {row['survey_alpha_min']}", flush=True)
     fine_close = band_measures(runs[f"band_E{CLOSED_ENERGY:.6g}_fine"])
     head, dirty = git_state()
     slivers = json.loads((RESULTS / "slivers.json").read_text())
     numerics = json.loads((RESULTS / "numerics.json").read_text())
-    checks = run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirty)
+    checks = run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirty, survey)
     for name, ok, detail in checks:
         print(f"CHECK {name:30s} {'PASS' if ok else 'FAIL'}  {detail}")
     out = {"energies": ENERGIES, "per_energy": per_energy, "closing_fine": {k: v for k, v in fine_close.items() if k != "rows"},
@@ -596,7 +603,7 @@ def fits(per_energy):
                                  "energies": [r["energy"] for r in low]}}
 
 
-def run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirty):
+def run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirty, survey):
     checks = []
     # (1) paper energy vs stage 8.
     n, worst, moved, _ = compare_with_stage8(runs[f"band_E{E_PAPER:.6g}"])
@@ -659,7 +666,7 @@ def run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirt
     # Range, and provenance.
     at_end = [r["energy"] for r in per_energy if r["windows_at_range_end"]]
     checks.append(("band inside the d range", not at_end, f"energies with windows at a range end: {at_end}"))
-    checks.append(("provenance", *provenance(runs, exps, slivers, numerics, head, dirty)))
+    checks.append(("provenance", *provenance(runs, {**exps, **survey}, slivers, numerics, head, dirty)))
     return checks
 
 
@@ -695,7 +702,7 @@ def make_figures(summary, runs):
                          "ytick.labelsize": 13, "axes.grid": False, "legend.frameon": False})
     rows = summary["per_energy"]
     E = np.array([r["energy"] for r in rows])
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(24, 5))
     op = [r for r in rows if r["n_window_points"]]
     ax1.loglog(E, [-r["sharp_edge"] for r in rows], "ko-", mfc="none", label="sharp edge")
     ax1.fill_between([r["energy"] for r in op], [-r["window_hi"] for r in op], [-r["window_lo"] for r in op],
@@ -711,8 +718,13 @@ def make_figures(summary, runs):
         pts = [(r["energy"], v) for r in rows for v in r["exponents"].values() if v["kind"] == k]
         ax3.errorbar([e for e, _ in pts], [1 - v["alpha"] for _, v in pts], yerr=[v["alpha_err"] for _, v in pts],
                      fmt="o", color=color, mfc="none", label=label)
+    surv = [(r["energy"], v) for r in rows for v in r["survey"].values()]
+    ax3.plot([e for e, _ in surv], [1 - v["alpha"] for _, v in surv], ".", color="0.5", ms=5, label="survey points")
     ax3.set_xscale("log"); ax3.axhline(0, color="0.5", lw=1)
-    ax3.set_xlabel(r"$\tilde E$"); ax3.set_ylabel(r"uncertainty dimension $D=1-\alpha$"); ax3.legend(fontsize=11)
+    ax3.set_xlabel(r"$\tilde E$"); ax3.set_ylabel(r"uncertainty dimension $D=1-\alpha$"); ax3.legend(fontsize=10)
+    sv = [r for r in rows if r["survey_fractal_share"] is not None]
+    ax4.semilogx([r["energy"] for r in sv], [100 * r["survey_fractal_share"] for r in sv], "ko-", mfc="none")
+    ax4.set_xlabel(r"$\tilde E$"); ax4.set_ylabel(fr"survey points with $\alpha<{FRACTAL_ALPHA}$ (%)")
     fig.tight_layout()
     for ext in ("pdf", "png"):
         fig.savefig(ROOT / "figures" / f"band_scan_vs_energy.{ext}", dpi=110)
