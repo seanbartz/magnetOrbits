@@ -6310,7 +6310,7 @@
   {
    "name": "paper energy vs stage-8c strip",
    "pass": true,
-   "detail": "4640 common points, max rel b_out diff 8.2e-07; rows with a different sharp edge: 0"
+   "detail": "4640 common points, max rel b_out diff 8.2e-07; rows with a different sharp edge: 0 (stage-8c run 088c16f3, clean and complete)"
   },
   {
    "name": "stage-8 exponents reproduced",
@@ -6353,7 +6353,7 @@
    "detail": "dirty runs []; dirty exponents []; analysis tree dirty False; commits ['b0ec2340', 'e068730c', 'e1a36589']; runtime code differs at []"
   }
  ],
- "analysis_git_hash": "efd5314fba8b147b718cfa01d471421e9a860ca1",
+ "analysis_git_hash": "238f5c2a25558fcbc2cd70f7d3e33631c32831eb",
  "analysis_git_dirty": false,
- "created": "2026-09-25 10:52:18"
+ "created": "2026-09-25 20:19:42"
 }
