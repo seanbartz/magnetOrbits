@@ -9,8 +9,10 @@ Checks
 * band points: the most-edges and median-d window points on the exponent rows, with intervals
   that contain their windows; survey points spread over each row's window d range;
 * the numerics-consistency rule accepts Poisson-scale differences and rejects systematic ones;
+* a stored exponent entry is reused only for exactly the same point, settings and sample size;
 * torus_index recognizes grid angles (mod 2 pi) and rejects off-grid ones;
-* regression: 4x-scan strip points recomputed at two energies equal tests/reference/band_maps.npz.
+* regression: 4x-scan strip points recomputed at two energies equal tests/reference/band_maps.npz
+  (same interval count; b_out to B_OUT_TOLERANCE, the bisection-limited precision).
 """
 
 import json
@@ -23,8 +25,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "analysis"))
 
-from band_scan import (EXPONENT_ROWS, NARROW, WIDE, band_measures, band_points, escape_windows,   # noqa: E402
-                       numerics_consistent, row_measures, strip_grid, survey_points, torus_index)
+from band_scan import (B_OUT_TOLERANCE, EXPONENT_ROWS, NARROW, WIDE, band_measures, band_points,   # noqa: E402
+                       escape_windows, matches, numerics_consistent, row_measures, strip_grid, survey_points,
+                       torus_index)
 from physics.edges import strip_axes, strip_point                                                 # noqa: E402
 
 REFERENCE = ROOT / "tests" / "reference" / "band_maps.npz"
@@ -103,6 +106,24 @@ def test_numerics_consistency_rule():
     assert numerics_consistent(ok) and not numerics_consistent(bad)
 
 
+def test_band_points_skip_records_without_a_window_pair():
+    data = synthetic_strip()
+    for i in EXPONENT_ROWS:                       # two intervals, but a missed edge: no 'ce' -> 'ec' pair
+        data["records"][(i, 4)]["edge_kinds"] = ["ce", "ce", "ce"]
+    pts = band_points(data)
+    assert all(p["j"] != 4 for p in pts.values())
+
+
+def test_stored_entries_reused_only_for_the_same_point():
+    point = {"kind": "band", "b_lo": 1.0, "b_hi": 1.3, "phi1": 0.5, "phi2": 2.1}
+    settings = {"start_radius": 64000.0, "method": "numba"}
+    stored = {**point, "settings": settings, "samples": 20000, "alpha": 0.3}
+    assert matches(stored, point, settings, 20000)
+    assert not matches(stored, {**point, "b_hi": 1.31}, settings, 20000)
+    assert not matches(stored, point, {**settings, "start_radius": 128000.0}, 20000)
+    assert not matches(stored, point, settings, 50000)
+
+
 def test_band_measures_area_and_b_range():
     m = band_measures(synthetic_strip())
     ds, dd = np.pi / 32, np.pi * 0.01
@@ -125,4 +146,4 @@ def test_regression_against_stored_band_maps(energy_key, i, j):
     meta = json.loads(str(ref[f"{energy_key}__meta"]))
     rec = strip_point(meta["settings"]["energy"], i, j, meta["grid"], meta["settings"])
     assert rec["n_intervals"] == ref[f"{energy_key}__n_intervals"][i, j]
-    assert rec["outer_edge"] == pytest.approx(ref[f"{energy_key}__outer_edge"][i, j], rel=1e-12)
+    assert rec["outer_edge"] == pytest.approx(ref[f"{energy_key}__outer_edge"][i, j], rel=B_OUT_TOLERANCE)

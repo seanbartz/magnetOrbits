@@ -49,9 +49,14 @@ stage-8 settings and seed, which must reproduce the stored counts exactly (check
 Checks (analyze): (1) paper energy: sharp edges and b_out match the stage-8c strip, stage-8
 counts reproduced; (2) +z/-z alpha = 1 at every energy, and the anti-line counts are unchanged by
 tightened numerics; (3) b_out and the sharp edge unchanged
-under the 4x scan; (4) no windows at E = 0.3 on the finer d grid, windows at 0.25; (5) strip points
-on the 32 x 32 grid match the stage-6a maps; plus completeness and provenance.
-Output: results/band_scan/{exponents,summary}.json, figures/band_scan_*.pdf.
+under the 4x scan, except contact slivers next to windows (and rare fractal outer edges), where a
+16x scan must confirm the 4x value; (4) windows at E = 0.3, none at 0.35, also on the finer d grid
+with the corner rows; (5) strip points on the 32 x 32 grid match the stage-6a maps; plus
+completeness (rare undecided ranges allowed and listed) and provenance.
+Exponent stores are resumable; an entry is reused only if it was computed for exactly the point,
+settings and sample size the current rules generate, and analyze uses only those entries.
+Inputs besides the strips: results/band_scan/{exponents,survey,slivers,numerics}.json and the
+stage-8c strip results/strip_mirror. Output: results/band_scan/summary.json, figures/band_scan_*.pdf.
 """
 
 import os
@@ -73,7 +78,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from physics import central                                                      # noqa: E402
-from physics.edges import (capture_profile, completeness, in_plane_moment,   # noqa: E402
+from physics.edges import (capture_profile, completeness, completeness_problem, in_plane_moment,   # noqa: E402
                            load_map, strip_angles, strip_point)
 from physics.fractal import (fit_exponent, outcome_codes, resolution_scaling,   # noqa: E402
                              sample_points, uncertain_counts)
@@ -94,6 +99,9 @@ EXPONENT_ROWS = (8, 16)                  # s = pi/4, pi/2
 SURVEY_PER_ROW, SURVEY_SAMPLES = 6, 20000
 FRACTAL_ALPHA = 0.8                      # survey points with alpha below this count as fractal
 SAMPLES, SEED = 50000, 20260925
+B_OUT_TOLERANCE = 2e-6                   # twice the bisection rel_tol
+MAX_UNRESOLVED_SHARE = 1e-3              # strip points allowed an undecided (timeout) range
+MAX_UNCONVERGED_SHARE = 1e-3             # 4x-moved points the 16x scan may fail to confirm
 SCAN_SIZES = [51, 201, 801, 3201, 12801]
 RESULTS = ROOT / "results" / "band_scan"
 ANALYSIS_PATHS = ("analysis/band_scan.py", "analysis/energy_scan.py", "analysis/uncertainty.py",
@@ -152,9 +160,6 @@ def run_strips(workers=min(18, os.cpu_count() or 1)):
         t0 = time.time()
         subprocess.run(cmd, cwd=ROOT, check=True)        # output not captured: progress and errors stay visible
         print(f"  [{time.time() - t0:.0f} s]", flush=True)
-
-
-MAX_UNRESOLVED_SHARE = 1e-3     # points with an undecided (timeout) range inside the band
 
 
 def load_run(name, energy, grid, settings):
@@ -279,7 +284,7 @@ def band_points(data):
     """
     points = {}
     for i in EXPONENT_ROWS:
-        js = [j for j in range(len(data["across"])) if data["n_intervals"][i, j] >= 2]
+        js = window_columns(data, i)
         if not js:
             continue
         most = max(js, key=lambda j: (len(data["records"][(i, j)]["edges"]), -j))
@@ -289,6 +294,12 @@ def band_points(data):
                 continue
             points[f"band_s{data['along'][i] / np.pi:.2f}_{label}"] = window_point(data, i, j, "band")
     return points
+
+
+def window_columns(data, i):
+    """Columns j of row i with escape windows (n_intervals >= 2 and a 'ce' -> 'ec' edge pair)."""
+    return [j for j in range(len(data["across"]))
+            if data["n_intervals"][i, j] >= 2 and escape_windows(data["records"][(i, j)])]
 
 
 def window_point(data, i, j, kind):
@@ -307,33 +318,11 @@ def survey_points(data):
     """SURVEY_PER_ROW window points per EXPONENT_ROWS row, evenly spread over the row's window d range."""
     points = {}
     for i in EXPONENT_ROWS:
-        js = [j for j in range(len(data["across"])) if data["n_intervals"][i, j] >= 2 and escape_windows(data["records"][(i, j)])]
+        js = window_columns(data, i)
         for k in sorted({int(round(x)) for x in np.linspace(0, len(js) - 1, min(SURVEY_PER_ROW, len(js)))}):
             j = js[k]
             points[f"survey_s{data['along'][i] / np.pi:.2f}_d{data['across'][j] / np.pi:+.4f}"] = window_point(data, i, j, "survey")
     return points
-
-
-def run_survey(workers=min(18, os.cpu_count() or 1)):
-    """Exponents at survey points of every energy with windows (resumable: results/band_scan/survey.json)."""
-    path = RESULTS / "survey.json"
-    head, dirty = git_state()
-    store = json.loads(path.read_text()) if path.exists() else {"points": {}}
-    store.setdefault("runs", []).append({"git_hash": head, "git_dirty": dirty, "at": time.strftime("%Y-%m-%d %H:%M:%S")})
-    with ProcessPoolExecutor(max_workers=workers) as pool:
-        for energy in ENERGIES:
-            settings = {"start_radius": energy_scan.scan_settings(energy)["start_radius"], "method": "numba"}
-            data = load_run(f"band_E{energy:.6g}_scan4", energy, strip_grid(energy), strip_settings(energy, SCAN_FACTOR))
-            for name, point in survey_points(data).items():
-                key = f"{energy:.6g}/{name}"
-                if key in store["points"]:
-                    continue
-                t0 = time.time()
-                res = exponent(pool, workers, energy, point, settings, samples=SURVEY_SAMPLES)
-                store["points"][key] = {**res, "energy": energy, "settings": settings, "git_hash": head, "git_dirty": dirty}
-                path.write_text(json.dumps(store, indent=1))
-                print(f"{key:40s} [{point['b_lo']:.4f}, {point['b_hi']:.4f}]  alpha = {res['alpha']:.3f} "
-                      f"+- {res['alpha_err']:.3f}  [{time.time() - t0:.0f} s]", flush=True)
 
 
 def control_points(energy, settings):
@@ -379,38 +368,109 @@ def exponent(pool, workers, energy, point, settings, samples=SAMPLES, seed=SEED)
             "alpha": alpha, "alpha_err": alpha_err, "fit_used": used.tolist(), "samples": samples, "seed": seed}
 
 
-def run_exponents(workers=min(18, os.cpu_count() or 1)):
-    """Exponents at every energy's band points and controls (resumable: results/band_scan/exponents.json)."""
+def point_settings(energy):
+    return {"start_radius": energy_scan.scan_settings(energy)["start_radius"], "method": "numba"}
+
+
+def exponent_jobs(energy, data):
+    """{key: (point, settings)} for exponents.json at this energy (data: the 4x strip run)."""
+    settings = point_settings(energy)
+    points = {**control_points(energy, strip_settings(energy)), **band_points(data)}
+    jobs = {f"{energy:.6g}/{p}": (point, settings) for p, point in points.items()}
+    if energy == E_PAPER:        # stage-8 points with the stage-8 settings: must reproduce exactly
+        for p in ("band_A", "band_B"):
+            m1, m2, b_lo, b_hi, _ = uncertainty.POINTS[p]
+            jobs[f"{energy:.6g}/stage8_{p}"] = ({"m1": list(map(float, m1)), "m2": list(map(float, m2)),
+                                                 "b_lo": b_lo, "b_hi": b_hi, "kind": "stage8"}, uncertainty.SETTINGS)
+    return jobs
+
+
+def survey_jobs(energy, data):
+    """{key: (point, settings)} for survey.json at this energy."""
+    settings = point_settings(energy)
+    return {f"{energy:.6g}/{name}": (point, settings) for name, point in survey_points(data).items()}
+
+
+ENERGY_OF_KEY = {f"{e:.6g}": e for e in ENERGIES}
+STORES = {"exponents": ("exponents.json", exponent_jobs, SAMPLES),
+          "survey": ("survey.json", survey_jobs, SURVEY_SAMPLES)}
+POINT_FIELDS = ("kind", "b_lo", "b_hi", "phi1", "phi2", "m", "m1", "m2")
+
+
+def matches(stored, point, settings, samples):
+    """Whether a stored exponent entry was computed for exactly this point, settings and sample size."""
+    return (all(stored.get(f) == point.get(f) for f in POINT_FIELDS) and stored.get("settings") == settings
+            and stored.get("samples") == samples)
+
+
+def current_jobs(store_name, runs=None):
+    """{key: (point, settings)} that the current rules generate for a store, over all energies."""
+    _, jobs_fn, _ = STORES[store_name]
+    jobs = {}
+    for energy in ENERGIES:
+        name = f"band_E{energy:.6g}_scan4"
+        data = runs[name] if runs else load_run(name, energy, strip_grid(energy), strip_settings(energy, SCAN_FACTOR))
+        jobs.update(jobs_fn(energy, data))
+    return jobs
+
+
+def scaling_job(args):
+    energy, m1, m2, b_lo, b_hi, settings = args
+    return resolution_scaling(energy, m1, m2, b_lo, b_hi, SCAN_SIZES, settings)
+
+
+def run_store(store_name, workers=min(18, os.cpu_count() or 1)):
+    """Compute a store's exponent points (resumable: results/band_scan/<file>).
+
+    A stored entry is reused only if it was computed for exactly the point, settings and sample
+    size the current rules generate; otherwise it is recomputed. Band points also get a resolution
+    scan, run in the pool alongside the sampling.
+    """
+    file, _, samples = STORES[store_name]
     RESULTS.mkdir(parents=True, exist_ok=True)
-    path = RESULTS / "exponents.json"
+    path = RESULTS / file
     head, dirty = git_state()
     store = json.loads(path.read_text()) if path.exists() else {"points": {}}
     store.setdefault("runs", []).append({"git_hash": head, "git_dirty": dirty, "at": time.strftime("%Y-%m-%d %H:%M:%S")})
+    jobs = current_jobs(store_name)
     with ProcessPoolExecutor(max_workers=workers) as pool:
-        for energy in ENERGIES:
-            settings = {"start_radius": energy_scan.scan_settings(energy)["start_radius"], "method": "numba"}
-            name = f"band_E{energy:.6g}_scan4"
-            data = load_run(name, energy, strip_grid(energy), strip_settings(energy, SCAN_FACTOR))
-            points = {**control_points(energy, strip_settings(energy)), **band_points(data)}
-            jobs = [(f"{energy:.6g}/{p}", energy, point, settings) for p, point in points.items()]
-            if energy == E_PAPER:        # stage-8 points with the stage-8 settings: must reproduce exactly
-                for p in ("band_A", "band_B"):
-                    m1, m2, b_lo, b_hi, _ = uncertainty.POINTS[p]
-                    jobs.append((f"{energy:.6g}/stage8_{p}", energy,
-                                 {"m1": list(map(float, m1)), "m2": list(map(float, m2)), "b_lo": b_lo, "b_hi": b_hi,
-                                  "kind": "stage8"}, uncertainty.SETTINGS))
-            for key, e, point, s in jobs:
-                if key in store["points"]:
-                    continue
-                t0 = time.time()
-                res = exponent(pool, workers, e, point, s)
-                if point["kind"] == "band":
-                    res["resolution"] = resolution_scaling(e, *moments(point), point["b_lo"], point["b_hi"],
-                                                           SCAN_SIZES, s)
-                store["points"][key] = {**res, "energy": e, "settings": s, "git_hash": head, "git_dirty": dirty}
-                path.write_text(json.dumps(store, indent=1))
-                print(f"{key:40s} [{point['b_lo']:.4f}, {point['b_hi']:.4f}]  alpha = {res['alpha']:.3f} "
-                      f"+- {res['alpha_err']:.3f}  [{time.time() - t0:.0f} s]", flush=True)
+        for key, (point, settings) in jobs.items():
+            old = store["points"].get(key)
+            if old is not None and matches(old, point, settings, samples):
+                continue
+            if old is not None:
+                print(f"{key}: stored entry is for a different point or settings; recomputing", flush=True)
+            t0 = time.time()
+            energy = ENERGY_OF_KEY[key.split("/", 1)[0]]
+            scaling = (pool.submit(scaling_job, (energy, *moments(point), point["b_lo"], point["b_hi"], settings))
+                       if point["kind"] == "band" else None)
+            res = exponent(pool, workers, energy, point, settings, samples=samples)
+            if scaling is not None:
+                res["resolution"] = scaling.result()
+            store["points"][key] = {**res, "energy": energy, "settings": settings, "git_hash": head, "git_dirty": dirty}
+            path.write_text(json.dumps(store, indent=1))
+            print(f"{key:40s} [{point['b_lo']:.4f}, {point['b_hi']:.4f}]  alpha = {res['alpha']:.3f} "
+                  f"+- {res['alpha_err']:.3f}  [{time.time() - t0:.0f} s]", flush=True)
+
+
+def load_store(store_name, runs):
+    """The current points of a store, each checked against what the current rules generate.
+
+    Entries the current rules no longer generate are ignored; a missing or mismatched entry means
+    the store is stale (rerun `band_scan.py exponents` / `survey`).
+    """
+    file, _, samples = STORES[store_name]
+    stored = json.loads((RESULTS / file).read_text())["points"]
+    points, stale = {}, []
+    for key, (point, settings) in current_jobs(store_name, runs).items():
+        if key in stored and matches(stored[key], point, settings, samples):
+            points[key] = stored[key]
+        else:
+            stale.append(key)
+    if stale:
+        raise SystemExit(f"{file}: {len(stale)} entries missing or computed for other points/settings, e.g. "
+                         f"{stale[:3]}; rerun `python analysis/band_scan.py {store_name}`")
+    return points
 
 
 NUMERICS_ENERGY = 0.002
@@ -484,10 +544,6 @@ def compare_with_torus(strip, escan):
     return n, mism, worst
 
 
-B_OUT_TOLERANCE = 2e-6          # twice the bisection rel_tol
-MAX_UNCONVERGED_SHARE = 1e-3    # points whose outer edge itself lies in fractal structure
-
-
 def scan_refinement(base, fine):
     """How the 4x b scan changes a strip.
 
@@ -515,6 +571,10 @@ def scan_refinement(base, fine):
 def compare_with_stage8(base):
     """Paper-energy production strip vs the stage-8c strip on their common lattice points."""
     s8 = load_map(ROOT / "results" / "strip_mirror")
+    problem = completeness_problem(s8)
+    if problem or s8["meta"]["git_dirty"] or s8["meta"].get("git_mixed", False):
+        raise SystemExit(f"results/strip_mirror (stage 8c) is incomplete ({problem}) or dirty/mixed; "
+                         "rerun it from committed code (analysis/run_strips.sh)")
     worst, n = 0.0, 0
     for (i, j), rec in base["records"].items():
         i8, j8 = 2 * i, j - 96                       # s step pi/32 vs pi/64; d offset -3/8 vs -3/16
@@ -534,8 +594,7 @@ def compare_with_stage8(base):
 
 def analyze():
     runs = load_runs()
-    exps = json.loads((RESULTS / "exponents.json").read_text())["points"]
-    survey = json.loads((RESULTS / "survey.json").read_text())["points"]
+    exps, survey = load_store("exponents", runs), load_store("survey", runs)
     per_energy = []
     for e in ENERGIES:
         base, fine = runs[f"band_E{e:.6g}"], runs[f"band_E{e:.6g}_scan4"]
@@ -606,9 +665,10 @@ def fits(per_energy):
 def run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirty, survey):
     checks = []
     # (1) paper energy vs stage 8.
-    n, worst, moved, _ = compare_with_stage8(runs[f"band_E{E_PAPER:.6g}"])
+    n, worst, moved, s8_hash = compare_with_stage8(runs[f"band_E{E_PAPER:.6g}"])
     checks.append(("paper energy vs stage-8c strip", worst < 2e-6 and moved == 0,
-                   f"{n} common points, max rel b_out diff {worst:.1e}; rows with a different sharp edge: {moved}"))
+                   f"{n} common points, max rel b_out diff {worst:.1e}; rows with a different sharp edge: {moved} "
+                   f"(stage-8c run {s8_hash[:8]}, clean and complete)"))
     ref = json.loads((ROOT / "tests" / "reference" / "uncertainty_summary.json").read_text())["points"]
     same = {p: exps[f"{E_PAPER:.6g}/stage8_{p}"]["uncertain"] == ref[p]["uncertain"]
             and exps[f"{E_PAPER:.6g}/stage8_{p}"]["totals"] == ref[p]["totals"] for p in ("band_A", "band_B")}
@@ -777,11 +837,11 @@ if __name__ == "__main__":
     if mode in ("slivers", "all"):
         run_slivers()
     if mode in ("exponents", "all"):
-        run_exponents()
+        run_store("exponents")
     if mode in ("numerics", "all"):
         run_numerics()
     if mode in ("survey", "all"):
-        run_survey()
+        run_store("survey")
     if mode in ("analyze", "all"):
         analyze()
     if mode == "save-reference":
