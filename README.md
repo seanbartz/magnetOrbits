@@ -57,7 +57,8 @@ physics/fast.py   compiled DOP853 + events + in-state quadrature;
                   run_trajectory(..., method="numba"), ~380x faster        (stage 7)
 analysis/compare_maps.py   map vs stored reference (numba vs scipy)        (stage 7)
 physics/capture.py   bisection for the contact/escape edge b_c           (stage 3)
-physics/central.py   independent -kappa/r^3 oracle: b_c, quadrature Theta  (stages 2-3)
+physics/central.py   independent -kappa/r^3 oracle: b_c, quadrature Theta  (stages 2-3);
+                     locked head-to-tail law with the co-rotating spin (locked_*)
 ```
 
 Every later sweep calls `physics.solve.run_trajectory`, so any sweep point can be

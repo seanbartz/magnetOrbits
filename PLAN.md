@@ -22,11 +22,20 @@ Independent parameters: $\tilde E$ (relative KE $/U_0$), $\tilde b=b/R$, four or
 angles; initial spins zero. For uniformly magnetized spheres
 $\tilde E=\tfrac34\rho v_{\rm rel}^2/\mu_0M^2$ — the sphere size drops out.
 
-Central-force baseline, $U=-\kappa/r^3$ ($\kappa=1$: $+z/-z$; $\kappa=2$: locked head-to-tail):
+Central-force baseline, $U=-\kappa/r^3$ ($\kappa=1$: $+z/-z$, exact; $\kappa=2$: head-to-tail with
+the spin ignored, Eq. 18 of arXiv:2212.00876):
 
 - $\tilde b_c=(27\kappa^2/4)^{1/6}\tilde E^{-1/3}$ for $\tilde E<\kappa/16$ (barrier-limited)
 - $\tilde b_c=\sqrt{4+\kappa/2\tilde E}$ for $\tilde E>\kappa/16$ (contact-limited)
 - $\chi\to 2\kappa/(\tilde E\tilde b^3)$ as $\tilde b\to\infty$
+
+Locked head-to-tail law (corrected 2026-10-04; `central.locked_*`): moments held along $\hat r$
+co-rotate with the line of centers, so $J=(r^2+2\tilde I)\dot\theta$ and
+$U_{\rm eff}=J^2/2(r^2+2\tilde I)-2/r^3$, $J=\tilde b\sqrt{2\tilde E}$. With $r^*$ the root of
+$\tilde E=(r^{*2}+6\tilde I)/r^{*5}$: $\tilde b_c^2=3(r^{*2}+2\tilde I)^2/\tilde Er^{*5}$ below
+$\tilde E_x=(4+6\tilde I)/32=0.275$, $\tilde b_c^2=(4+2\tilde I)(1+1/4\tilde E)$ above. The spin lowers the
+centrifugal barrier: the locked edge is 0.8% ($\tilde E=10^{-3}$) to 18% (large $\tilde E$) above the
+spin-free $\kappa=2$ law. Before 2026-10-04 "the locked law" in this project meant the spin-free one.
 
 Rigorous escape criterion: $\dot r>0$ and $\tfrac12\dot r^2>2/r^3$ (radial dipole force is
 bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps).
@@ -52,7 +61,7 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
 - [x] **5. Paper comparison** (Bartz & Shaw, arXiv:2212.00876): moments along the incoming
   $\hat r$, $\tilde E=3\tilde R^3v_i^2\approx0.0335$.
   *Check:* their max colliding $b/R=4.65$ (Fig. 4 caption) vs our value and the locked
-  value 5.37. Expected discrepancy (their 4.65 is likely the sticking edge, not the touching
+  value (5.756 with the spin included; 5.373 for the spin-free law of the paper's Eq. 18). Expected discrepancy (their 4.65 is likely the sticking edge, not the touching
   edge) is reported, not tuned away.
   *Numerics note:* the torque on an incoming non-spinning dipole falls only as $1/r^3$, so an
   orientation specified at a finite $r_0$ differs from the one at infinity by
@@ -123,7 +132,7 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
 - [x] **6a. Collision edge vs. energy** (approved 2026-09-24; in-plane orientations only).
   16 energies $10^{-3}\le\tilde E\le10$ (log-spaced, incl. the paper value and the crossovers
   $1/16$, $1/8$). Per energy: a $32\times32$ symmetry-reduced map (`analysis/energy_scan.py`), with
-  $b_{\max}=\max(10,\,2b_c^{\rm locked})$ at $\Delta b\approx0.05$ and $r_0=\max(1000,\,64000\cdot\tilde E_{\rm paper}/\tilde E)$
+  $b_{\max}=\max(10,\,2b_c^{\rm spin\text{-}free})$ at $\Delta b\approx0.05$ and $r_0=\max(1000,\,64000\cdot\tilde E_{\rm paper}/\tilde E)$
   (holds the in-state error $\propto(1/\tilde I\tilde Er_0)^2$ at its validated level).
   Outputs: head-to-tail $b_{\rm out}(\tilde E)$; $\sigma=2\langle b_{\rm out}\rangle$ over orientations, plus
   the capture-measure version; min/max over orientations; fraction with escape windows.
@@ -134,13 +143,17 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   tighter rtol and a 2x scan on sampled points; orientation-grid error from $16\times16$ subsampling.
   *Results* (all checks PASS; `tests/reference/energy_scan.json`, notebook section 11):
   - $+z/-z$ edge matches the analytic formula to $4.5\times10^{-8}$ at all 16 energies (both branches).
-  - Slow limit: head-to-tail $b_{\rm out}/b_c^{\rm locked}=1.008$ at $\tilde E=10^{-3}$, approaching 1 as
-    $\tilde E^{0.64}$; the orientation average is $1.0006$ there. The minimum over orientations is
-    head-to-head and approaches $(1/2)^{1/3}$ (the $\kappa=1$ law: 0.7964 at $10^{-3}$), as the
-    antiparallel invariant family predicts.
-  - Head-to-tail beats the locked law by up to $12\%$ at the crossover $\tilde E=1/8$, then falls
-    below it (0.96 at $\tilde E=0.5$–1). The orientation average peaks at $+4\%$ near $0.05$ and
-    reaches $0.86$ at $\tilde E\approx0.5$.
+  - *Corrected 2026-10-04* (comparisons now against the locked law with the spin included; the
+    first version compared with the spin-free law and reported head-to-tail beating it by up to
+    12%, which was the missing spin term):
+  - Slow limit: head-to-tail $b_{\rm out}/b_c^{\rm locked}-1=+1.7\times10^{-7}$ at $\tilde E=10^{-3}$ and
+    $-4.7\times10^{-6}$ at $10^{-2}$ (the edge bisection tolerance is $10^{-6}$); the free and locked
+    deflections agree to $(3$–$4)\times10^{-4}$ at $\tilde E=0.002$. The orientation average is 0.993
+    of the locked edge there (the antiparallel grid line alone accounts for about 0.7%). The
+    minimum over orientations is head-to-head, within 0.4% of the $+z/-z$ law.
+  - No orientation exceeds the locked edge at any of the 16 energies (max ratio $1+2\times10^{-7}$).
+  - Head-to-tail falls below the locked law above the paper energy: 0.99975 at 0.0335, 0.977 at
+    $1/8$, 0.81 at 0.5–1. The orientation average: 0.967, 0.873, 0.73.
   - Fast limit: $b_{\rm out}\to2$ ($2.013$ at $\tilde E=10$), with $(b^2-4)\tilde E\to0.51$, i.e.
     $\kappa_{\rm eff}\approx1.03$.
   - Escape windows only for $0.02\lesssim\tilde E\lesssim0.2$ (the grid-limited 3.1% plateau is one
@@ -153,7 +166,8 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   sharp low-$d$ edge, a ragged high-$d$ side and $D\approx0.65$–$0.73$ (8c, 8f). The $32\times32$ maps
   (6a) show windows only for $0.02\lesssim\tilde E\lesssim0.2$, but the 3.1% plateau there is one grid
   diagonal, so the grid cannot say how wide the band is, where it opens and closes, or whether
-  either end is tied to the locked-law crossovers $\tilde E=1/16$ (barrier to contact) and $1/8$.
+  either end is tied to the power-law crossovers $\tilde E=1/16$ and $1/8$ (barrier to contact, for
+  $\kappa=1$ and the spin-free $\kappa=2$ law; the locked law's crossover, with spin, is 0.275).
   Driver: `analysis/band_scan.py`; references `tests/reference/band_scan.json`, `band_maps.npz`.
   - [x] **9a. Mirror strips across energy.** A one-row probe ($s=\pi/2$, 4x scan) showed that the
     band persists below $\tilde E=0.01$, so the planned range was extended. Strips at 11 energies,
@@ -186,8 +200,8 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
     $\tilde E<0.05$, reaching $0.18\pi$ at 0.35. Above $\tilde E\approx0.1$ the band bends into an arc
     in $s$ and breaks up.
   - **Size:** the band's share of in-plane orientations is 0.1% at $\tilde E=0.002$ and peaks at
-    **5.2% at $\tilde E=1/8$**. That is the locked law's barrier-to-contact crossover, the same
-    energy as the 6a head-to-tail peak. It then falls to 0.85% at 0.25, 0.03% at 0.3, and 0 at 0.35.
+    **5.2% at $\tilde E=1/8$** (the spin-free $\kappa=2$ crossover; the locked law's own crossover,
+    0.275, is where the band closes; either may be a coincidence). It then falls to 0.85% at 0.25, 0.03% at 0.3, and 0 at 0.35.
   - **Fractality is bimodal:** each surveyed window is smooth ($D\approx0$) or fractal, with
     $D=0.55$–$0.75$ at every energy. The fractal share of survey points is 0/8, 1/12, 2/12,
     4/12, 8/12, 8/12, 9/12, 5/12, 1/4 at $\tilde E=0.002$ … 0.25.
@@ -220,8 +234,8 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   to $5\times10^{-4}$ (relative); orders 1.97–2.02 in $r_0$ confirmed to $6.4\times10^4$. Maps use
   $r_0=64000$ (residual $\le3\times10^{-7}$, +15% cost). `run_trajectory` default unchanged (1000).
 - **Paper discrepancy** (stage 5; closed 2026-09-24 at the user's direction, not pursued further; the strict xfail stays as documentation). Head-to-tail at $\tilde E=0.033501$: our collision
-  edge $b_c=5.75459$ (converged to $2\times10^{-8}$; single interval; $1.071\times$ the locked
-  value 5.3729) vs. the paper's $4.65$. Ruled out: $r_0$, rtol, alignment with $\hat r$ at a
+  edge $b_c=5.75459$ (converged to $2\times10^{-8}$; single interval; 0.99975 of the locked law
+  with spin, 5.75601; $1.071\times$ the paper's spin-free power law, 5.3729) vs. the paper's $4.65$. Ruled out: $r_0$, rtol, alignment with $\hat r$ at a
   finite start ($\ge5.66$ even at $8R$), and sticking vs. touching (first-bounce sticking
   estimate with $\Gamma=0.05$: $5.54$). $\tilde E$ larger by $2.07\times$ would give $4.65$
   — suggestive of a factor-2 convention difference; needs the original GlowScript code.
@@ -236,8 +250,8 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   Accuracy check (18 points incl. all multi-interval orbits; rtol $10^{-12}$, $2r_0$, $2\times$ scan):
   identical interval structure, edges agree to $4.9\times10^{-7}$. Results:
   outer edge ranges from $4.178$ at $(\phi_1,\phi_2)=(0,\pi)$ (head-to-head, repulsive on approach)
-  to $5.756$ near head-to-tail; torus mean $5.565$ (locked-dipole value $5.373$), so most
-  orientations collide beyond the locked value. The low-edge "diamond" is two different features
+  to $5.7555$ near head-to-tail; torus mean $5.565$ (locked law with spin $5.756$; spin-free
+  $5.373$), so most orientations reach 97–100% of the locked edge and none exceed it. The low-edge "diamond" is two different features
   (re-analyzed 2026-09-24):
   - a sharp, symmetric dip on the antiparallel lines $\phi_2=\phi_1\pm\pi$ ($b_{\rm out}\approx4.7$
     on the line, $\approx5.35$ one cell away). For $\hat\mu_2=-\hat\mu_1$ the torques are equal, so
