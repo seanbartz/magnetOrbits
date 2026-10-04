@@ -2,7 +2,8 @@
 
 Checks
 ------
-* scaling rules: b_max covers twice the locked edge, db ~ 0.05, r0 = 64000 at the paper energy
+* scaling rules: b_max is twice the spin-free -2/r^3 edge (at least 1.6x the locked edge), db ~ 0.05,
+  r0 = 64000 at the paper energy
   (the validated setting) with E r0 held fixed, and the 1000 floor at high energy;
 * orbit-weighted averaging: records sampled on the fundamental domain from a symmetric torus map
   (built without symmetry_orbit) reproduce its exact means (weights sum to n^2; the 16 x 16
@@ -42,6 +43,7 @@ REFERENCE = ROOT / "tests" / "reference" / "energy_scan.json"
 def test_scaling_rules(energy):
     cfg = scan_settings(energy)
     assert cfg["b_max"] >= 2 * central.capture_impact_parameter(energy, 2.0) - 1e-12 and cfg["b_max"] >= 10.0
+    assert cfg["b_max"] >= 1.6 * central.locked_capture_impact_parameter(energy)
     db = (cfg["b_max"] - B_MIN) / (cfg["n_scan"] - 1)
     assert 0.049 < db < 0.051
     assert cfg["start_radius"] >= 1000.0
@@ -141,6 +143,21 @@ def test_stored_scan_provenance_is_current():
             pytest.skip(f"run commit {h[:8]} not in the local git history")
     ok, detail = provenance(rows, head, False)
     assert ok, f"{detail} -- rerun analysis/energy_scan.py and regenerate the reference"
+
+
+def test_oracle_is_not_runtime_code():
+    """physics/central.py is excluded from the provenance diff, so no runtime file may import it."""
+    import re
+    from energy_scan import NON_RUNTIME_ORACLES
+    import sweep
+    files = [p for path in sweep.RUNTIME_PATHS for p in ((ROOT / path).rglob("*.py") if (ROOT / path).is_dir()
+                                                          else [ROOT / path])]
+    oracles = {ROOT / p for p in NON_RUNTIME_ORACLES}
+    pattern = re.compile(r"^\s*(from\s+physics(\.central)?\s+import\s+.*\bcentral\b|import\s+physics\.central|"
+                         r"from\s+physics\.central\s+import|from\s+\.\s*import\s+.*\bcentral\b|from\s+\.central\s+import)",
+                         re.MULTILINE)
+    offenders = [str(f.relative_to(ROOT)) for f in files if f not in oracles and pattern.search(f.read_text())]
+    assert not offenders, f"runtime code imports the oracle: {offenders}"
 
 
 def test_analysis_paths_exist():

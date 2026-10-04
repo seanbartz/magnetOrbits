@@ -65,7 +65,7 @@ def make_figures(data, stem):
     extent = (-step / 2, 2 * np.pi - step / 2, -step / 2, 2 * np.pi - step / 2)
     ticks = [0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi]
     labels = ["0", r"$\pi/2$", r"$\pi$", r"$3\pi/2$", r"$2\pi$"]
-    locked = central.capture_impact_parameter(energy, 2.0)
+    locked = central.locked_capture_impact_parameter(energy)
 
     panels = [("outer_edge", r"outer collision edge $b_{\rm out}/R$", "viridis", f"{stem}_outer_edge.pdf"),
               ("capture_measure", r"capture measure $/R$", "viridis", f"{stem}_measure.pdf"),
@@ -74,12 +74,14 @@ def make_figures(data, stem):
     for key, label, cmap, fname in panels:
         fig, ax = plt.subplots(figsize=(7.2, 6))
         # imshow rows = phi2 (vertical), columns = phi1 (horizontal): "b vs (phi1, phi2)".
+        # the outer-edge scale extends to the locked edge (the upper bound observed in stage 6a)
+        vmax = max(np.nanmax(data[key]), locked) if key == "outer_edge" else None
         im = ax.imshow(data[key].T, origin="lower", extent=extent, cmap=cmap, aspect="equal",
-                       interpolation="nearest")
+                       interpolation="nearest", vmax=vmax)
         cb = fig.colorbar(im, ax=ax)
         cb.set_label(label)
         if key == "outer_edge":
-            cb.ax.axhline(locked, color="w", lw=2)       # locked-dipole value for reference
+            cb.ax.axhline(locked, color="w", lw=2)       # locked head-to-tail edge (spin included), for reference
         ax.set_xticks(ticks), ax.set_xticklabels(labels)
         ax.set_yticks(ticks), ax.set_yticklabels(labels)
         ax.set_xlabel(r"$\phi_1$")
@@ -137,14 +139,14 @@ def main():
 
     outer = data["outer_edge"]
     nint = data["n_intervals"]
-    locked = central.capture_impact_parameter(energy, 2.0)
+    locked = central.locked_capture_impact_parameter(energy)
     antiparallel_z = central.capture_impact_parameter(energy, 1.0)
     i_max, j_max = np.unravel_index(np.nanargmax(outer), outer.shape)
     i_min, j_min = np.unravel_index(np.nanargmin(outer), outer.shape)
     print(f"outer edge: min {np.nanmin(outer):.4f} at phi = ({data['phi'][i_min]:.3f}, {data['phi'][j_min]:.3f}), "
           f"max {np.nanmax(outer):.4f} at ({data['phi'][i_max]:.3f}, {data['phi'][j_max]:.3f}), "
           f"torus mean {np.nanmean(outer):.4f}")
-    print(f"  reference: locked head-to-tail (kappa=2) {locked:.4f}; +z/-z (kappa=1) {antiparallel_z:.4f}")
+    print(f"  reference: locked head-to-tail (spin included) {locked:.4f}; +z/-z (kappa=1) {antiparallel_z:.4f}")
     counts = {k: int((nint == k).sum()) for k in np.unique(nint)}
     print(f"contact-interval counts over the grid: {counts}")
     print(f"timeouts: {int(data['n_timeouts'].sum())}; contact at scan top: "

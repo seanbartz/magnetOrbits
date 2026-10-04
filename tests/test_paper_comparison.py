@@ -77,9 +77,12 @@ def test_energy_mapping():
 def test_our_edge_regression():
     found = find_capture_edge(paper.ENERGY_TILDE, X_HAT, X_HAT, 5.70, 5.80, rel_tol=1e-10)
     assert found["edge"] == pytest.approx(OUR_EDGE, abs=5e-7)
-    # 7% above the locked-dipole (kappa = 2) power-law edge.
-    locked = central.capture_impact_parameter(paper.ENERGY_TILDE, 2.0)
-    assert found["edge"] / locked == pytest.approx(1.0710, abs=1e-3)
+    # 0.025% below the locked head-to-tail law (spin included; 5.756012), its adiabatic limit,
+    # and 7% above the -2/r^3 law with the spin ignored (5.372901).
+    locked = central.locked_capture_impact_parameter(paper.ENERGY_TILDE)
+    assert found["edge"] / locked == pytest.approx(0.99975, abs=2e-5)
+    spin_free = central.capture_impact_parameter(paper.ENERGY_TILDE, 2.0)
+    assert found["edge"] / spin_free == pytest.approx(1.0710, abs=1e-3)
 
 
 @pytest.mark.xfail(strict=True, reason="documented 24% discrepancy with arXiv:2212.00876 Fig. 4 "
