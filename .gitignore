@@ -16,3 +16,6 @@ figures/*.png
 # upper-edge chaos study outputs
 upper_edge_chaos_scripts/data/
 upper_edge_chaos_scripts/output/
+
+# jupyterlab-lsp shadow copies
+notebooks/.virtual_documents/

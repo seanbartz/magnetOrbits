@@ -58,6 +58,8 @@ physics/fast.py   compiled DOP853 + events + in-state quadrature;
 analysis/compare_maps.py   map vs stored reference (numba vs scipy)        (stage 7)
 analysis/delta_phi.py   stored maps re-indexed to (phi1, dphi = phi2 - phi1) and
                         (phi1 + phi2, dphi); notebooks/delta_phi_maps.ipynb
+upper_edge_chaos_scripts/   exploratory: regular vs fractal window edge in the
+                            mirror band at s = pi/4 (see its README)        (stage 9)
 physics/capture.py   bisection for the contact/escape edge b_c           (stage 3)
 physics/central.py   independent -kappa/r^3 oracle: b_c, quadrature Theta  (stages 2-3)
 ```
@@ -83,7 +85,8 @@ python analysis/map_checks.py results/torus32              # checks + figures/
 ```
 
 Progress notebook (open in Jupyter, or re-execute from the shell; needs the optional
-`notebook` dependencies, `pip install -e ".[notebook]"`):
+`notebook` dependencies, `pip install -e ".[notebook]"`, or the conda environment in
+[environment.yml](environment.yml), which also registers the `magnetorbits` Jupyter kernel):
 
 ```bash
 jupyter nbconvert --to notebook --execute --inplace notebooks/progress_summary.ipynb
