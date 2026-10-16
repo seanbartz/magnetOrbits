@@ -6,7 +6,7 @@ E=0.03350081271247681
 def dense(b,m,rt=1e-12):
     r=run_trajectory(E,b,m[0],m[1],start_radius=64000.,stop='escape',rtol=rt,atol=rt*1e-2,method='reference',keep_solution=True)
     sol=r['solution']; t=sol.t
-    rr=np.linalg.norm(sol.y[0:3],axis=0); k=np.where(rr<12)[0]
+    rr=np.linalg.norm(sol.y[0:3],axis=0); k=np.where(rr<12)[0] if (rr<12).any() else np.array([np.argmin(rr)])
     t0,t1=t[k[0]],min(t[-1],t[k[-1]]+60)
     tt=np.linspace(t0,t1,int((t1-t0)*20)+2); Y=sol.sol(tt)
     return dict(b=b,outcome=r['outcome'],t=tt-tt[0],y=Y[:15])

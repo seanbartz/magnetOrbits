@@ -38,4 +38,5 @@ provenance of the figures.
 | `trajs.py`, `echk.py` | Dense trajectories for the figures (`trajs.pkl`) and the energy split at apoapsis |
 | `figs.py` | Figures 1–3: band overview, regular vs. fractal edge, trapped orbits |
 
-Rough order: `bd_image` → `upper_survey` / `cut` → `stair2 1e-13` → `unc`, `unc_d` → `trajs` → `figs`.
+Rough order for the figures: `bd_image` → `cut` (`RT=1e-12`) → `stair2 1e-13` → `unc_d` → `trajs` → `figs`.
+`stair` (writes `stairB.npz`) is needed by `po` and `rtolchk`. `unc` gives the cut A/B exponents, which the figures don't use.

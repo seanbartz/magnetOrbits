@@ -21,6 +21,6 @@ if __name__=='__main__':
         with Pool(2,initializer=init,initargs=(m,)) as p: codes=''.join(p.map(f,ball,chunksize=500))
         rows=uncertain_counts(codes,n,eps); cnt=np.array([r[0] for r in rows]); tot=np.array([r[1] for r in rows])
         L=effective_length(lo,hi,EPS); a,ae,use=fit_exponent(eps,cnt,tot,min_count=10,eps_max=L/30)
-        res.append(dict(dpi=dd/np.pi,b=[lo,hi],alpha=a,alpha_err=ae,counts=cnt.tolist(),eps=list(eps)))
+        res.append(dict(dpi=dd/np.pi,b=[lo,hi],n=n,alpha=a,alpha_err=ae,counts=cnt.tolist(),eps=list(eps)))
         print('d/pi=%.4f b=[%.3f,%.3f] alpha=%.3f±%.3f'%(dd/np.pi,lo,hi,a,ae),cnt.tolist(),flush=True)
     json.dump(res,open(data('unc_d.json'),'w'),indent=1)

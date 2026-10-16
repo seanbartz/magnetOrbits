@@ -11,6 +11,7 @@ if __name__=='__main__':
         print(name,'outcome flips',(R[:,0]!=d['out'][idx]).mean(),'npk changes',(R[:,1]!=d['npk'][idx]).mean())
     be=float(np.load(data('stairB.npz'))['be']); mB=mirror(np.pi/4,-0.07*np.pi)
     lo,hi=be-1e-8,be+1e-8
+    assert probe(lo,*mB,rtol=1e-12,atol=1e-14)[0]==0 and probe(hi,*mB,rtol=1e-12,atol=1e-14)[0]==1, 'edge moved more than 1e-8 at rtol 1e-12'
     for _ in range(40):
         mid=(lo+hi)/2
         if probe(mid,*mB,rtol=1e-12,atol=1e-14)[0]==0: lo=mid
