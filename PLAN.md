@@ -3,7 +3,7 @@
 Approved 2026-09-23. Increments are checked off as their validation passes. Each finished
 stage also gets a section in `notebooks/progress_summary.ipynb` (explanation, equations,
 validation figures from code imported from `physics/`, results table, next steps), committed
-with the stage. The notebook covers stages 1–7 as of 2026-09-24.
+with the stage. The notebook covers stages 1–9 as of 2026-09-25.
 
 ## Setup
 
@@ -147,6 +147,59 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
     diagonal of the $32\times32$ grid).
   - Resolution: $2r_0$, rtol $10^{-12}$ and a 2x scan change the maps by $\le7.7\times10^{-7}$ at
     $\tilde E=10^{-3}$, $0.0335$ and 10; orientation-grid error $\le0.8\%$.
+- [x] **9. The fractal window band vs. energy** (proposed and run 2026-09-25; in-plane orientations).
+  *Question:* how do the extent and the fractal dimension of the escape-window band depend on
+  $\tilde E$? At the paper energy the band is $-0.075\pi\lesssim d\lesssim0$ below the mirror line, with a
+  sharp low-$d$ edge, a ragged high-$d$ side and $D\approx0.65$–$0.73$ (8c, 8f). The $32\times32$ maps
+  (6a) show windows only for $0.02\lesssim\tilde E\lesssim0.2$, but the 3.1% plateau there is one grid
+  diagonal, so the grid cannot say how wide the band is, where it opens and closes, or whether
+  either end is tied to the locked-law crossovers $\tilde E=1/16$ (barrier to contact) and $1/8$.
+  Driver: `analysis/band_scan.py`; references `tests/reference/band_scan.json`, `band_maps.npz`.
+  - [x] **9a. Mirror strips across energy.** A one-row probe ($s=\pi/2$, 4x scan) showed that the
+    band persists below $\tilde E=0.01$, so the planned range was extended. Strips at 11 energies,
+    $\tilde E=0.002$–$0.35$; 32 rows in $s$ ($\pi/32$); in $d$, $\pi/2048$ over $[-\pi/16,\pi/64]$ below
+    $\tilde E=0.02$ and $\pi/512$ over $[-3\pi/8,\pi/8]$ above. Each strip was run at the 6a settings and
+    with a 4x $b$ scan; band statistics come from the 4x runs.
+  - [x] **9b. Uncertainty exponents across energy.** Two band points per row ($s=\pi/4$, $\pi/2$) turned
+    out to be too few: one kind of point came out smooth and the other fractal. A **survey** was
+    added: 6 window points per row, spread over the band's $d$ range (20000 samples each).
+    Controls at every energy: $+z/-z$. The antiparallel line was meant as a second control but is
+    not smooth at low energy (see results), so it is reported as a result.
+  - [x] **9c. Notebook section 12.**
+  *Checks* (all PASS; `analysis/band_scan.py analyze`):
+  - (1) at the paper energy, $b_{\rm out}$ matches the 8c strip to $8.2\times10^{-7}$ on 4640 common
+    points, with the same sharp edge in every row. The stage-8 points reproduce their counts
+    exactly ($\alpha=0.351$, $0.266$).
+  - (2) $+z/-z$: $\alpha=1.030\pm0.021$ at all 11 energies. The antiparallel-line structure at
+    $\tilde E=0.002$ has Poisson-consistent counts under rtol $10^{-12}$ and $2r_0$.
+  - (3) 4x $b$ scan: no row's sharp edge moves. $b_{\rm out}$ moves at 81/81248 points: 80 thin
+    contact slivers found above the production edge next to windows, and 1 corner point with
+    fractal structure at its edge. A 16x scan confirms the 4x $b_{\rm out}$ at all 81. Points with a
+    ~$10^{-5}$-wide undecided (timeout) range, 11 in all, are allowed and listed; their interval
+    count is unknown.
+  - (4) the band closes between $\tilde E=0.3$ and $0.35$: 9 window points at 0.3 (a pocket near
+    head-to-head / tail-to-tail), none at 0.35, also on a $\pi/2048$ grid of 16 rows.
+  - (5) strip points on the $32\times32$ grid reproduce the 6a maps (816 points, identical).
+  Also: no windows at the ends of the $d$ range; provenance clean, runtime code unchanged.
+  *Results:*
+  - **Position:** the sharp edge lies below the mirror line by $-d\approx0.52\pi\,\tilde E^{0.54}$ for
+    $\tilde E<0.05$, reaching $0.18\pi$ at 0.35. Above $\tilde E\approx0.1$ the band bends into an arc
+    in $s$ and breaks up.
+  - **Size:** the band's share of in-plane orientations is 0.1% at $\tilde E=0.002$ and peaks at
+    **5.2% at $\tilde E=1/8$**. That is the locked law's barrier-to-contact crossover, the same
+    energy as the 6a head-to-tail peak. It then falls to 0.85% at 0.25, 0.03% at 0.3, and 0 at 0.35.
+  - **Fractality is bimodal:** each surveyed window is smooth ($D\approx0$) or fractal, with
+    $D=0.55$–$0.75$ at every energy. The fractal share of survey points is 0/8, 1/12, 2/12,
+    4/12, 8/12, 8/12, 9/12, 5/12, 1/4 at $\tilde E=0.002$ … 0.25.
+    - Below $1/8$ the fractal part grows from the mirror-line side, and the sharp-edge side stays
+      smooth.
+    - From $1/8$ up, the side toward the mirror line is smooth and the far side of the arc is
+      fractal.
+  - **Antiparallel line:** at $\tilde E=0.002$ it has a fat-fractal zone about $2.5\times10^{-3}$ wide
+    just below its outer edge ($\alpha=0.40$). The edge count grows 4x per 4x scan refinement,
+    while the measure changes by 1.5%. This invariant family is not integrable, so its scattering
+    is chaotic near the orbiting edge. From $\tilde E=0.005$ up $\alpha\approx1.04$ on the same
+    intervals: the zone, if present, is too thin to register.
 
 ## Findings so far
 
