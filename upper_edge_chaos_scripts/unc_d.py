@@ -14,6 +14,7 @@ if __name__=='__main__':
     for dpi in [-0.068,-0.064,-0.060,-0.057,-0.054,-0.051,-0.048,-0.045]:
         i=np.argmin(abs(ds/np.pi-dpi)); dd=ds[i]
         tr=np.where(np.diff(out[i])!=0)[0]
+        if len(tr)<2: print('d/pi=%.4f: no window in bd_s025 row, skipped'%(dd/np.pi),flush=True); continue
         lo,hi=bs[tr[0]]-0.005,bs[tr[1]+1]+0.005
         m=mirror(np.pi/4,dd); n=4000
         c,eps,ball=sample_points(lo,hi,EPS,n,seed=11)

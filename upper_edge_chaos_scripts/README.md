@@ -30,7 +30,7 @@ provenance of the figures.
 | `bd_image.py` → `data/bd_s025.npz` | (b, d) outcome map over the band |
 | `bd_zoom.py`, `look.py` | Zoomed maps and quick-look plots |
 | `upper_survey.py` | Counts transitions near the upper window edge as a function of d |
-| `cut.py`, `lookcut.py` | 1-D cuts in b at fixed d (`cA0_12`, `cA1_12`, `cA2_12`, `cB0_12`, ...) |
+| `cut.py`, `lookcut.py` | 1-D cuts in b at fixed d. The `_12` cuts that `figs.py`, `trajs.py` and `poA.py` read (`cA0_12`, `cA1_12`, `cA2_12`, `cB0_12`) were run with `RT=1e-12` (the default is 1e-10) |
 | `stair.py`, `stair2.py` | Bisect the cut-B edge and sample the periapsis staircase below it (`stairB*.npz`) |
 | `rtolchk.py` | Tolerance checks for cut-A outcomes and the cut-B edge location |
 | `po.py`, `poA.py` | Per-periapsis state along trapped orbits near the B and A edges |
