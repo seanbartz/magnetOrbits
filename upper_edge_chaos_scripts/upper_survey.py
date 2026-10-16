@@ -1,9 +1,9 @@
+from paths import data
 import numpy as np, sys
 from multiprocessing import Pool
-sys.path.insert(0,'scratch')
 from probe import probe, mirror
 s=np.pi/4
-f=np.load('scratch/bd_s025.npz'); out=f['out']; ds=f['ds']; bs=f['bs']
+f=np.load(data('bd_s025.npz')); out=f['out']; ds=f['ds']; bs=f['bs']
 def work(i):
     d=ds[i]; o=out[i]
     # window = escape run(s) below outer escape region; outer region = last run of escapes reaching b=6

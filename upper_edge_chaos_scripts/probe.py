@@ -1,5 +1,6 @@
 """Outcome + periapsis count for one trajectory via the repo's compiled integrator
 (same in-state and events as solve.run_trajectory(method='numba', stop='escape'))."""
+import paths
 import numpy as np
 from physics import fast
 from physics.solve import initial_state

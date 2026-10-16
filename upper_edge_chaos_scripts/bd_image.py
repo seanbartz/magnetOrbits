@@ -1,6 +1,6 @@
+from paths import data
 import numpy as np, sys, time
 from multiprocessing import Pool
-sys.path.insert(0,'scratch')
 from probe import probe, mirror
 s=np.pi/4
 ds=np.linspace(-0.09*np.pi,0.01*np.pi,101)
@@ -10,5 +10,5 @@ def row(d):
 if __name__=='__main__':
     t=time.time()
     with Pool(2) as p: R=p.map(row,ds)
-    R=np.array(R); np.savez('scratch/bd_s025.npz',out=R[...,0],npk=R[...,1],ds=ds,bs=bs,s=s)
+    R=np.array(R); np.savez(data('bd_s025.npz'),out=R[...,0],npk=R[...,1],ds=ds,bs=bs,s=s)
     print('s',time.time()-t, 'timeouts',(R[...,0]==2).sum())

@@ -1,9 +1,10 @@
+from paths import data
 import numpy as np, pickle
 from physics.solve import run_trajectory
 E=0.03350081271247681; I=0.8
-import sys; sys.path.insert(0,'scratch'); from probe import mirror
+from probe import mirror
 m=mirror(np.pi/4,-0.042*np.pi)
-T=pickle.load(open('scratch/trajs.pkl','rb'))
+T=pickle.load(open(data('trajs.pkl'),'rb'))
 for tr in T['A']:
     r=run_trajectory(E,tr['b'],*m,start_radius=64000.,stop='escape',rtol=1e-12,atol=1e-14,method='reference',keep_solution=True)
     sol=r['solution']; y=sol.y; rr=np.linalg.norm(y[0:3],axis=0)

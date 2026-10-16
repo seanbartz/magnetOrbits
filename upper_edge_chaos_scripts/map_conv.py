@@ -1,3 +1,4 @@
+import paths
 import numpy as np
 from physics.solve import run_trajectory
 E=0.03350081271247681

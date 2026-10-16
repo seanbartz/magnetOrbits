@@ -1,6 +1,6 @@
+from paths import data
 import numpy as np, sys, json
 from multiprocessing import Pool
-sys.path.insert(0,'scratch')
 from probe import probe, mirror
 from physics.fractal import sample_points, uncertain_counts, fit_exponent, effective_length
 EPS=[1e-3,3e-4,1e-4,3e-5,1e-5,3e-6,1e-6,3e-7,1e-7]
@@ -22,4 +22,4 @@ if __name__=='__main__':
         a,ae,use=fit_exponent(eps,cnt,tot,min_count=10,eps_max=L/30)
         res[k]=dict(dpi=dpi,b=[lo,hi],eps=list(eps),counts=cnt.tolist(),totals=tot.tolist(),alpha=a,alpha_err=ae,used=use.tolist(),L=L)
         print(k,'alpha=%.3f±%.3f'%(a,ae),'counts',cnt.tolist())
-    json.dump(res,open('scratch/unc.json','w'),indent=1)
+    json.dump(res,open(data('unc.json'),'w'),indent=1)

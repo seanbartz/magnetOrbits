@@ -11,20 +11,23 @@ provenance of the figures.
 
 ## Assumptions
 
-- Run from the repo root so that `physics` imports. Each script does
-  `sys.path.insert(0, 'scratch')` and reads/writes `scratch/*.npz|json|pkl`,
-  so copy `probe.py` into `scratch/` first (or put this directory on the path
-  and create `scratch/` for the outputs).
-- `figs.py` writes to `OUT='/mnt/user-data/outputs/'`; change it before running locally.
+- Run each script by path from any directory, e.g.
+  `python upper_edge_chaos_scripts/bd_image.py`. `paths.py` puts the repo root
+  on `sys.path` so that `physics` imports.
+- Intermediate results (`*.npz`, `*.json`, `trajs.pkl`) go to
+  `upper_edge_chaos_scripts/data/`. Figures from `figs.py` go to
+  `upper_edge_chaos_scripts/output/`. Both folders are gitignored. Set
+  `UEC_DATA` / `UEC_OUT` to use other locations.
 - The pools use 2 workers (`Pool(2)`).
 
 ## Pieces
 
 | Script | Role |
 |---|---|
+| `paths.py` | Repo-root import path and the `data/` / `output/` locations |
 | `probe.py` | Shared helper: outcome (0 escape, 1 contact, 2 timeout) and periapsis count for one trajectory using `physics.fast.integrate_scattering`; `mirror(s, d)` builds the moment pair |
 | `timing.py`, `xcheck.py`, `map_conv.py`, `chk.py` | Sanity checks: speed, start radius, outcome edges vs. `run_trajectory` |
-| `bd_image.py` → `scratch/bd_s025.npz` | (b, d) outcome map over the band |
+| `bd_image.py` → `data/bd_s025.npz` | (b, d) outcome map over the band |
 | `bd_zoom.py`, `look.py` | Zoomed maps and quick-look plots |
 | `upper_survey.py` | Counts transitions near the upper window edge as a function of d |
 | `cut.py`, `lookcut.py` | 1-D cuts in b at fixed d (`cA0_12`, `cA1_12`, `cA2_12`, `cB0_12`, ...) |

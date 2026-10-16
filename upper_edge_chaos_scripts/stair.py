@@ -1,6 +1,6 @@
+from paths import data
 import numpy as np, sys
 from multiprocessing import Pool
-sys.path.insert(0,'scratch')
 from probe import probe, mirror
 s=np.pi/4; dpi=-0.07
 m1,m2=mirror(s,dpi*np.pi)
@@ -16,7 +16,7 @@ x=np.logspace(-12.5,-1.5,600)
 def f(dx): return probe(be-dx,m1,m2)[:2]
 if __name__=='__main__':
     with Pool(2) as p: R=np.array(p.map(f,x))
-    np.savez('scratch/stairB.npz',dx=x,out=R[:,0],npk=R[:,1],be=be)
+    np.savez(data('stairB.npz'),dx=x,out=R[:,0],npk=R[:,1],be=be)
     for k in range(1,40):
         sel=(R[:,0]==0)&(R[:,1]==k)
         if sel.any(): print(k, '%.3e .. %.3e'%(x[sel].min(),x[sel].max()))

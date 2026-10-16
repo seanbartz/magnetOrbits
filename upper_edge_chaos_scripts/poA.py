@@ -1,7 +1,7 @@
+from paths import data
 import numpy as np, sys
-sys.path.insert(0,'scratch')
 from probe import probe, mirror, I
-d=np.load('scratch/cA1_12.npz'); k=np.argsort(-d['npk'])[:3]
+d=np.load(data('cA1_12.npz')); k=np.argsort(-d['npk'])[:3]
 m=mirror(np.pi/4,-0.042*np.pi)
 for b in d['b'][k]:
     out,npk,tc,tp,yp,y0=probe(b,*m,rtol=1e-12,atol=1e-14,keep=True)

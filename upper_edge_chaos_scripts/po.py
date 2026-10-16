@@ -1,7 +1,7 @@
+from paths import data
 import numpy as np, sys
-sys.path.insert(0,'scratch')
 from probe import probe, mirror, I
-s=np.pi/4; m1,m2=mirror(s,-0.07*np.pi); be=float(np.load('scratch/stairB.npz')['be'])
+s=np.pi/4; m1,m2=mirror(s,-0.07*np.pi); be=float(np.load(data('stairB.npz'))['be'])
 for dx in [1e-11, 1e-11*1.2]:
     out,npk,tc,tp,yp,y0=probe(be-dx,m1,m2,keep=True)
     print('dx',dx,'out',out,'npk',npk)

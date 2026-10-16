@@ -1,10 +1,10 @@
+from paths import data
 import numpy as np, sys, json
 from multiprocessing import Pool
-sys.path.insert(0,'scratch')
 from probe import probe, mirror
 from physics.fractal import sample_points, uncertain_counts, fit_exponent, effective_length
 EPS=[3e-4,1e-4,3e-5,1e-5,3e-6,1e-6,3e-7,1e-7]
-f0=np.load('scratch/bd_s025.npz'); out=f0['out']; ds=f0['ds']; bs=f0['bs']
+f0=np.load(data('bd_s025.npz')); out=f0['out']; ds=f0['ds']; bs=f0['bs']
 code={0:'e',1:'c',2:'t'}
 G={}
 def f(b): return code[probe(b,*G['m'],rtol=1e-12,atol=1e-14)[0]]
@@ -22,4 +22,4 @@ if __name__=='__main__':
         L=effective_length(lo,hi,EPS); a,ae,use=fit_exponent(eps,cnt,tot,min_count=10,eps_max=L/30)
         res.append(dict(dpi=dd/np.pi,b=[lo,hi],alpha=a,alpha_err=ae,counts=cnt.tolist(),eps=list(eps)))
         print('d/pi=%.4f b=[%.3f,%.3f] alpha=%.3f±%.3f'%(dd/np.pi,lo,hi,a,ae),cnt.tolist(),flush=True)
-    json.dump(res,open('scratch/unc_d.json','w'),indent=1)
+    json.dump(res,open(data('unc_d.json'),'w'),indent=1)
