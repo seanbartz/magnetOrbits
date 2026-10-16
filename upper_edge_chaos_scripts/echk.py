@@ -11,7 +11,8 @@ for tr in T['A']:
     Kr=0.5*I*((y[12:15]**2).sum(0)+(y[15:18]**2).sum(0)); Kt=0.5*(y[3:6]**2).sum(0)
     inn=rr<12
     if not inn.any(): print(r['outcome'],'never inside 12R, skipped'); continue
-    sel=np.where((rr>6)&(sol.t>sol.t[np.argmax(inn)]))[0]
+    loc=np.where((rr[1:-1]>rr[:-2])&(rr[1:-1]>rr[2:]))[0]+1   # turning points, not the stop point
+    sel=loc[(rr[loc]>6)&(loc>np.argmax(inn))]
     if len(sel):
         k=sel[np.argmax(rr[sel])]
         print(r['outcome'],'apoapsis r=%.2f  Krot/E=%.3f  Ktrans/E=%.3f'%(rr[k],Kr[k]/E,Kt[k]/E))

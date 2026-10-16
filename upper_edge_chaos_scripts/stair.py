@@ -8,7 +8,7 @@ m1,m2=mirror(s,dpi*np.pi)
 x=np.logspace(-12.5,-1.5,600)
 def edge():
     lo,hi=3.281,3.283   # escape at lo, contact at hi
-    assert probe(lo,m1,m2)[0]==0 and probe(hi,m1,m2)[0]==1
+    if not (probe(lo,m1,m2)[0]==0 and probe(hi,m1,m2)[0]==1): sys.exit('edge outside bracket')
     for _ in range(60):
         mid=0.5*(lo+hi)
         if probe(mid,m1,m2)[0]==0: lo=mid

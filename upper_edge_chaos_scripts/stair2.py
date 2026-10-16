@@ -7,7 +7,7 @@ mB=mirror(np.pi/4,-0.07*np.pi)
 RT=float(sys.argv[1]); AT=RT*1e-2
 def edge():
     lo,hi=3.28198,3.28199   # escape at lo, contact at hi
-    assert probe(lo,*mB,rtol=RT,atol=AT)[0]==0 and probe(hi,*mB,rtol=RT,atol=AT)[0]==1, 'edge outside bracket at this rtol'
+    if not (probe(lo,*mB,rtol=RT,atol=AT)[0]==0 and probe(hi,*mB,rtol=RT,atol=AT)[0]==1): sys.exit('edge outside bracket at this rtol')
     for _ in range(45):
         mid=(lo+hi)/2
         if probe(mid,*mB,rtol=RT,atol=AT)[0]==0: lo=mid

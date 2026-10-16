@@ -34,7 +34,7 @@ for c,r in zip(blues,u):
     ax[1].loglog(e[k],n[k],'o-',color=c,ms=3.5,lw=1.2,label=f"d = {r['dpi']:.3f}π"+(f"  α = {r['alpha']:.2f}" if r['alpha']==r['alpha'] else ''))
 ee=np.array([1e-7,3e-4]); ax[1].loglog(ee,0.02*(ee/3e-4),color=CB,lw=1,ls='--'); ax[1].text(2e-6,1.5e-4,'slope 1 (finite set of smooth edges)',color=CB,fontsize=7.5,rotation=27)
 ax[1].set_xlabel('ε'); ax[1].set_ylabel('uncertain fraction f(ε)'); ax[1].legend(fontsize=7,frameon=False,loc='lower right')
-ax[1].set_title(f"Uncertainty exponent across the band ({u[0].get('n',4000)} samples per d)",loc='left',fontsize=9); ax[1].grid(alpha=.15,which='both')
+ax[1].set_title(f"Uncertainty exponent across the band ({u[0].get('n',4000) if u else 0} samples per d)",loc='left',fontsize=9); ax[1].grid(alpha=.15,which='both')
 fig.tight_layout(); fig.savefig(out('chaos_1_band_overview.png'),dpi=140); plt.close(fig)
 # ---------- Figure 2: regular vs fractal edge ----------
 fig,axs=plt.subplots(3,2,figsize=(13,10))
