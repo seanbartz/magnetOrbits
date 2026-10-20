@@ -255,9 +255,25 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   symmetry partners agree to $2.2\times10^{-6}$ (one orbit of 4 points just above the $2\times10^{-6}$
   tolerance, 30/195584 comparisons above $10^{-6}$; bisection roundoff, no structure mismatches).
   *Result:* the dip and trough are now visible as lines; the minimum is $2.656$ on the antiparallel
-  line near tail-to-tail, $(\phi_1,\phi_2)=(0.969\pi,1.969\pi)$ (the stage-8c patch, at finer
-  spacing, finds $2.46$ nearby). Mean $5.564$, max $5.756$ unchanged; $2456/65536$ ($3.7\%$)
-  orientations have an escape window.
+  line near tail-to-tail, $(\phi_1,\phi_2)=(0.969\pi,1.969\pi)$ (the stage-8g patches, at finer
+  spacing, find $2.13$ nearby). Mean $5.564$, max $5.756$ unchanged; $2456/65536$ ($3.7\%$)
+  orientations have an escape window. Interpretation (from the edge lists; $d$ = offset below the
+  mirror line in cells of $\pi/128$):
+  - Off the two line families the map is a smooth plateau ($45\%$ of orientations within $1\%$ of
+    the maximum), so the coarse map's averages were already right.
+  - Antiparallel dip: $b_{\rm out}\approx4.72$ on the line, mirror-symmetric across it, rising
+    $\propto|d|^{0.52}$ between 1 and 4 cells (stage 8b: $0.57$).
+  - Mirror band: the escape window is born at $b=0$ on the mirror line and moves out linearly,
+    $b_w\approx0.35$ per cell ($\approx14R$ per radian), widening from $0.01$ at $d=-1$ to $0.37$ at
+    $d=-10$, while the outer contact piece above it shrinks ($5.35\to4.45$). The band's sharp low
+    edge is where that piece pinches off and $b_{\rm out}$ drops to the window's lower edge
+    ($4.45\to3.82$ at $s=\pi/2$).
+  - One-sidedness: reflection across the line of approach maps $(\phi_1,\phi_2,b)\to(-\phi_1,-\phi_2,-b)$,
+    i.e. $d\to-d$, $b\to-b$. In signed $b$ the window is one line $b\approx-\kappa d$ through $b=0$ on
+    the mirror line; $b\ge0$ shows only the $d<0$ half. Hypothesis (untested): it marks a balance
+    between orbital angular momentum and the spin from the orientation asymmetry.
+  - The minimum is the same pinch-off where the antiparallel dip crosses the band ($d=-8$), not a
+    deeper cusp; it sits on a jump, so its value depends on grid spacing (8g).
 
 - **Compiled integrator** (stage 7): `method="numba"` takes the same DOP853 steps as scipy
   (identical RHS-evaluation counts on 24 generic runs), end states agree to $\lesssim10^{-12}$,
