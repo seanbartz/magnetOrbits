@@ -65,39 +65,40 @@ def tidx(F,cond): return int(np.where(cond)[0][0])
 mB=mirror(np.pi/4,-0.07*np.pi); mA=mirror(np.pi/4,-0.042*np.pi)
 be=float(np.load(data('stairB_1e-13.npz'))['be'])
 
-# ---- 1. head-to-tail, b = 5R: capture (compare the static locked curve on slide 4) ----
-F=frozen(dense(5.0,(np.array([1.,0,0]),np.array([1.,0,0])),rcut=12,tail=30,npt=40)); print('h2t chk',F['chk'])
-r,t=F['r'],F['t']
-ks=[tidx(F,r<11),tidx(F,r<7),tidx(F,r<4.5),tidx(F,r<3),len(t)-1]
-fig,ax=plt.subplots(1,2,figsize=(14,5)); draw(ax[0],ax[1],F,ks,xlim=(2,12),ylim=(-2,3))
-save(fig,'frozen_ueff_head_to_tail.pdf')
+if __name__=='__main__':
+    # ---- 1. head-to-tail, b = 5R: capture (compare the static locked curve on slide 4) ----
+    F=frozen(dense(5.0,(np.array([1.,0,0]),np.array([1.,0,0])),rcut=12,tail=30,npt=40)); print('h2t chk',F['chk'])
+    r,t=F['r'],F['t']
+    ks=[tidx(F,r<11),tidx(F,r<7),tidx(F,r<4.5),tidx(F,r<3),len(t)-1]
+    fig,ax=plt.subplots(1,2,figsize=(14,5)); draw(ax[0],ax[1],F,ks,xlim=(2,12),ylim=(-2,3))
+    save(fig,'frozen_ueff_head_to_tail.pdf')
 
-# ---- 2. window edge pair, d = -0.07pi: b = 3.0R (contact) vs 3.2R (escape) ----
-fig,ax=plt.subplots(2,2,figsize=(14,9.5))
-for row,b0 in zip(ax,[3.0,3.2]):
-    F=frozen(dense(b0,mB,rcut=12,tail=30,npt=20)); r,t=F['r'],F['t']; print(b0,'chk',F['chk'])
-    kmin=int(np.argmin(r)) if r[-1]>3 else len(t)-1
-    ks=[tidx(F,r<9),tidx(F,r<5),kmin]
-    if kmin<len(t)-1: ks+=[len(t)-1]
-    draw(row[0],row[1],F,ks,xlim=(2,10),ylim=(-3,4))
-    row[0].text(0.97,0.95,f'b = {b0}R',transform=row[0].transAxes,ha='right',va='top')
-save(fig,'frozen_ueff_window.pdf')
+    # ---- 2. window edge pair, d = -0.07pi: b = 3.0R (contact) vs 3.2R (escape) ----
+    fig,ax=plt.subplots(2,2,figsize=(14,9.5))
+    for row,b0 in zip(ax,[3.0,3.2]):
+        F=frozen(dense(b0,mB,rcut=12,tail=30,npt=20)); r,t=F['r'],F['t']; print(b0,'chk',F['chk'])
+        kmin=int(np.argmin(r)) if r[-1]>3 else len(t)-1
+        ks=[tidx(F,r<9),tidx(F,r<5),kmin]
+        if kmin<len(t)-1: ks+=[len(t)-1]
+        draw(row[0],row[1],F,ks,xlim=(2,10),ylim=(-3,4))
+        row[0].text(0.97,0.95,f'b = {b0}R',transform=row[0].transAxes,ha='right',va='top')
+    save(fig,'frozen_ueff_window.pdf')
 
-# ---- 3. rocking orbit, 3e-9 below the cut-B edge ----
-F=frozen(dense(be-3e-9,mB,rt=1e-13)); r,t=F['r'],F['t']; print('rock chk',F['chk'])
-ph=(t>50)&(t<190)
-peri=np.where((r[1:-1]<r[:-2])&(r[1:-1]<r[2:])&ph[1:-1])[0]+1
-apo=np.where((r[1:-1]>r[:-2])&(r[1:-1]>r[2:])&ph[1:-1])[0]+1
-ks=sorted([peri[2],apo[apo>peri[2]][0],peri[3],apo[apo>peri[3]][0]])
-fig,ax=plt.subplots(1,2,figsize=(14,5)); draw(ax[0],ax[1],F,ks,xlim=(2,8),ylim=(-3,3),cmin=t[ks[0]]-30,cmax=t[ks[-1]]+30)
-save(fig,'frozen_ueff_rocking.pdf')
+    # ---- 3. rocking orbit, 3e-9 below the cut-B edge ----
+    F=frozen(dense(be-3e-9,mB,rt=1e-13)); r,t=F['r'],F['t']; print('rock chk',F['chk'])
+    ph=(t>50)&(t<190)
+    peri=np.where((r[1:-1]<r[:-2])&(r[1:-1]<r[2:])&ph[1:-1])[0]+1
+    apo=np.where((r[1:-1]>r[:-2])&(r[1:-1]>r[2:])&ph[1:-1])[0]+1
+    ks=sorted([peri[2],apo[apo>peri[2]][0],peri[3],apo[apo>peri[3]][0]])
+    fig,ax=plt.subplots(1,2,figsize=(14,5)); draw(ax[0],ax[1],F,ks,xlim=(2,8),ylim=(-3,3),cmin=t[ks[0]]-30,cmax=t[ks[-1]]+30)
+    save(fig,'frozen_ueff_rocking.pdf')
 
-# ---- 4. bound excursion on the fractal side (the contact member of the neighbor pair) ----
-d=np.load(data('cA2_12.npz')); o,n,b=d['out'],d['npk'],d['b']
-cand=[i for i in range(len(b)-1) if o[i]!=o[i+1] and min(n[i],n[i+1])>=12]; i=cand[len(cand)//2]
-P=[dense(b[i],mA,npt=10),dense(b[i+1],mA,npt=10)]; tr=[p for p in P if p['outcome']=='contact'][0]
-F=frozen(tr); r,t=F['r'],F['t']; print('excursion chk',F['chk'])
-kap=int(np.argmax(np.where(t>350,r,0)))
-ks=[tidx(F,(t>250)&(r>6)),kap,tidx(F,(t>t[kap])&(r<6)),len(t)-1]
-fig,ax=plt.subplots(1,2,figsize=(14,5)); draw(ax[0],ax[1],F,ks,xlim=(2,13),ylim=(-1.5,2.5),cmin=250,cmax=t[-1])
-save(fig,'frozen_ueff_bound_excursion.pdf')
+    # ---- 4. bound excursion on the fractal side (the contact member of the neighbor pair) ----
+    d=np.load(data('cA2_12.npz')); o,n,b=d['out'],d['npk'],d['b']
+    cand=[i for i in range(len(b)-1) if o[i]!=o[i+1] and min(n[i],n[i+1])>=12]; i=cand[len(cand)//2]
+    P=[dense(b[i],mA,npt=10),dense(b[i+1],mA,npt=10)]; tr=[p for p in P if p['outcome']=='contact'][0]
+    F=frozen(tr); r,t=F['r'],F['t']; print('excursion chk',F['chk'])
+    kap=int(np.argmax(np.where(t>350,r,0)))
+    ks=[tidx(F,(t>250)&(r>6)),kap,tidx(F,(t>t[kap])&(r<6)),len(t)-1]
+    fig,ax=plt.subplots(1,2,figsize=(14,5)); draw(ax[0],ax[1],F,ks,xlim=(2,13),ylim=(-1.5,2.5),cmin=250,cmax=t[-1])
+    save(fig,'frozen_ueff_bound_excursion.pdf')
