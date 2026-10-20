@@ -39,6 +39,7 @@ provenance of the figures.
 | `figs.py` | Figures 1–3: band overview, regular vs. fractal edge, trapped orbits |
 | `talk_figs.py` | Slide figures (PDF) for the APS EGLS 2026 talk; also needs `unc_d.json` and caches dense trajectories in `data/` |
 | `talk_effpot.py` | Slide 4 figures: effective potentials (locked head-to-tail with spin, out-of-plane moments) and trajectories at one (E, b) for three orientations |
+| `talk_ueff_frozen.py` | Instantaneous (frozen L, frozen orientations) U_eff with the system at (r, E − K_rot), for four orbits |
 
 Rough order for the figures: `bd_image` → `cut` (`RT=1e-12`) → `stair2 1e-13` → `unc_d` → `trajs` → `figs`.
 `stair` (writes `stairB.npz`) is needed by `po` and `rtolchk`. `unc` gives the cut A/B exponents, which the figures don't use.
