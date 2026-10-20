@@ -23,7 +23,7 @@ def ueff(r,case,J=J):
 r=np.linspace(2,14,2000)
 fig,ax=plt.subplots(figsize=(8.5,5.4))
 ax.axvspan(1.6,2,color='#000',alpha=0.08,lw=0)
-lab={'locked':'locked head-to-tail (with spin)','anti':'out of plane, antiparallel','par':'out of plane, parallel'}
+lab={'locked':'locked (adiabatic limit)','anti':'out of plane, antiparallel','par':'out of plane, parallel'}
 for c in ['locked','anti']:
     u=ueff(r,c)/E; ax.plot(r,u,color=COL[c],lw=2.2,label=lab[c])
     k=np.argmax(u);
