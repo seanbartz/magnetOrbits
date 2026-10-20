@@ -248,6 +248,16 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   Both are narrower than the grid (unresolved). 992/1024 orientations have one contact interval;
   the 32 in the trough ($\phi_1+\phi_2=15\pi/16$ and its flip image) have an escape window at
   $b\approx2.78$–$3.03$ inside the contact region. No timeouts, no contact at $b_{\max}=10$.
+- **Fine torus map** (2026-10-20, $256\times256$, numba, same settings as the $32\times32$ map;
+  `results/torus256_numba`, reference `tests/reference/map_torus256.npz`, figures
+  `figures/torus256_*.pdf`). 65536 points in 5.4 min on 18 workers. *Check:* every 8th point is
+  the $32\times32$ grid and reproduces `map_torus32.npz` exactly (`test_fine_map_contains_production_map`);
+  symmetry partners agree to $2.2\times10^{-6}$ (one orbit of 4 points just above the $2\times10^{-6}$
+  tolerance, 30/195584 comparisons above $10^{-6}$; bisection roundoff, no structure mismatches).
+  *Result:* the dip and trough are now visible as lines; the minimum is $2.656$ on the antiparallel
+  line near tail-to-tail, $(\phi_1,\phi_2)=(0.969\pi,1.969\pi)$ (the stage-8c patch, at finer
+  spacing, finds $2.46$ nearby). Mean $5.564$, max $5.756$ unchanged; $2456/65536$ ($3.7\%$)
+  orientations have an escape window.
 
 - **Compiled integrator** (stage 7): `method="numba"` takes the same DOP853 steps as scipy
   (identical RHS-evaluation counts on 24 generic runs), end states agree to $\lesssim10^{-12}$,

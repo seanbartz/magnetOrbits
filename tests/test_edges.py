@@ -113,6 +113,17 @@ def test_regression_against_production_map():
         assert rec["capture_measure"] == pytest.approx(ref["capture_measure"][i, j], rel=1e-9)
 
 
+def test_fine_map_contains_production_map():
+    """Every 8th point of the 256 x 256 numba map lies on the 32 x 32 grid and must reproduce it."""
+    from pathlib import Path
+    ref_dir = Path(__file__).parent / "reference"
+    coarse, fine = np.load(ref_dir / "map_torus32.npz"), np.load(ref_dir / "map_torus256.npz")
+    assert json.loads(str(fine["settings"]))["method"] == "numba"
+    np.testing.assert_array_equal(fine["n_intervals"][::8, ::8], coarse["n_intervals"])
+    np.testing.assert_allclose(fine["outer_edge"][::8, ::8], coarse["outer_edge"], rtol=2e-6)
+    np.testing.assert_allclose(fine["capture_measure"][::8, ::8], coarse["capture_measure"], rtol=2e-6)
+
+
 # --- undecided (timeout) handling and sweep bookkeeping (PR #4 review) ----------------------
 
 def scripted_outcomes(monkeypatch, rule):
