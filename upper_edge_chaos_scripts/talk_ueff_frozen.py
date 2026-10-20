@@ -12,9 +12,7 @@ import matplotlib.pyplot as plt
 from probe import mirror, I, E0
 from physics.solve import run_trajectory
 
-plt.rcParams.update({'font.size':14,'axes.labelsize':14,'legend.fontsize':12,
-                     'axes.spines.top':False,'axes.spines.right':False,'axes.edgecolor':'#666',
-                     'pdf.fonttype':42,'savefig.bbox':'tight'})
+import talk_style
 from matplotlib.colors import LinearSegmentedColormap
 CMAP=LinearSegmentedColormap.from_list('t',['#1f3b73','#2a78d6','#3aa58a','#e0a020','#d9531e'])
 
@@ -47,16 +45,16 @@ def draw(axL,axR,F,ks,xlim=(2,12),ylim=(-3,4),cmin=0,cmax=None):
     col=lambda k:CMAP(np.clip((t[k]-cmin)/(cmax-cmin),0,1))
     for a in (axL,axR):
         a.axvspan(xlim[0]-0.4,2,color='#000',alpha=0.08,lw=0); a.axhline(0,color='#bbb',lw=0.8)
-        a.set_xlim(xlim[0]-0.4,xlim[1]); a.set_ylim(*ylim); a.set_xlabel('r / R')
+        a.set_xlim(xlim[0]-0.4,xlim[1]); a.set_ylim(*ylim); a.set_xlabel(r'$r/R$')
     for k in ks:
         axL.plot(rg,curve(F,k,rg),color=col(k),lw=2)
         axL.plot(F['r'][k],F['Erad'][k],'o',ms=9,color=col(k),mec='white',mew=1.2,zorder=5)
     axR.plot(F['r'],F['Erad'],color='#ccc',lw=0.8,zorder=1)
     w=(t>=cmin)&(t<=cmax)
     pts=axR.scatter(F['r'][w],F['Erad'][w],c=t[w],cmap=CMAP,s=3,lw=0,vmin=cmin,vmax=cmax,rasterized=True,zorder=2)
-    cb=plt.colorbar(pts,ax=axR,pad=0.02); cb.set_label('time (t₀)')
+    cb=plt.colorbar(pts,ax=axR,pad=0.02); cb.set_label(r'time ($t_0$)')
     for k in ks: axR.plot(F['r'][k],F['Erad'][k],'o',ms=9,color=col(k),mec='white',mew=1.2,zorder=5)
-    axL.set_ylabel('U_eff / E'); axR.set_ylabel('(E − K_rot) / E')
+    axL.set_ylabel(r'$U_{\rm eff}/E$'); axR.set_ylabel(r'$(E-K_{\rm rot})/E$')
 
 def save(fig,name): fig.savefig(out(name)); plt.close(fig); print('wrote',name)
 
@@ -73,15 +71,15 @@ if __name__=='__main__':
     fig,ax=plt.subplots(1,2,figsize=(14,5)); draw(ax[0],ax[1],F,ks,xlim=(2,12),ylim=(-2,3))
     save(fig,'frozen_ueff_head_to_tail.pdf')
 
-    # ---- 2. window edge pair, d = -0.07pi: b = 3.0R (contact) vs 3.2R (escape) ----
-    fig,ax=plt.subplots(2,2,figsize=(14,9.5))
-    for row,b0 in zip(ax,[3.0,3.2]):
+    # ---- 2. escape window, d = -0.07pi: below (3.0R), inside (3.2R), above (3.4R) ----
+    fig,ax=plt.subplots(2,3,figsize=(21,11.5))
+    for j,(b0,lab) in enumerate([(3.0,'below'),(3.2,'inside'),(3.4,'above')]):
         F=frozen(dense(b0,mB,rcut=12,tail=30,npt=20)); r,t=F['r'],F['t']; print(b0,'chk',F['chk'])
-        kmin=int(np.argmin(r)) if r[-1]>3 else len(t)-1
-        ks=[tidx(F,r<9),tidx(F,r<5),kmin]
-        if kmin<len(t)-1: ks+=[len(t)-1]
-        draw(row[0],row[1],F,ks,xlim=(2,10),ylim=(-3,4))
-        row[0].text(0.97,0.95,f'b = {b0}R',transform=row[0].transAxes,ha='right',va='top')
+        esc=r[-1]>3; kmin=int(np.argmin(r)) if esc else len(t)-1
+        ks=[tidx(F,r<9),tidx(F,r<5),kmin]+([len(t)-1] if esc else [])
+        draw(ax[0,j],ax[1,j],F,ks,xlim=(2,10),ylim=(-3,4))
+        ax[0,j].set_title(rf'{lab}: $b={b0}R$, '+('escape' if esc else 'contact'))
+        if j: ax[0,j].set_ylabel(''); ax[1,j].set_ylabel('')
     save(fig,'frozen_ueff_window.pdf')
 
     # ---- 3. rocking orbit, 3e-9 below the cut-B edge ----

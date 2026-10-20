@@ -7,9 +7,7 @@ import matplotlib.pyplot as plt
 from physics.solve import run_trajectory
 from physics.model import SphereParams
 
-plt.rcParams.update({'font.size':14,'axes.labelsize':14,'legend.fontsize':12,
-                     'axes.spines.top':False,'axes.spines.right':False,'axes.edgecolor':'#666',
-                     'pdf.fonttype':42,'savefig.bbox':'tight'})
+import talk_style
 E=0.03350081271247681; B=5.0; I=SphereParams().inertia_tilde   # I = 4/5
 J=B*np.sqrt(2*E)                                                 # non-spinning in-state: J = L_orb
 COL={'locked':'#c0392b','anti':'#2a78d6','par':'#7a7a7a'}
@@ -28,9 +26,9 @@ for c in ['locked','anti']:
     u=ueff(r,c)/E; ax.plot(r,u,color=COL[c],lw=2.2,label=lab[c])
     k=np.argmax(u);
     if 0<k<len(r)-1: ax.plot(r[k],u[k],'o',color=COL[c],ms=6)
-ax.axhline(1,color='#222',lw=1.2,ls='--'); ax.text(13.9,1.06,'E',ha='right',fontsize=14)
+ax.axhline(1,color='#222',lw=1.2,ls='--'); ax.text(13.9,1.08,r'$E$',ha='right',fontsize=22)
 ax.set_xlim(1.6,14); ax.set_ylim(-1.5,2.5)
-ax.set_xlabel('r / R'); ax.set_ylabel('U_eff / E'); ax.text(1.8,-1.35,'contact',rotation=90,fontsize=11,color='#555',ha='center')
+ax.set_xlabel(r'$r/R$'); ax.set_ylabel(r'$U_{\rm eff}/E$'); ax.text(1.8,-1.35,'contact',rotation=90,fontsize=18,color='#555',ha='center')
 ax.legend(frameon=False,loc='lower right')
 fig.savefig(out('effective_potential.pdf')); plt.close(fig)
 
@@ -49,7 +47,7 @@ for c,name,m1,m2 in cases:
     if res['outcome']=='contact': ax.plot(y[0,-1],y[1,-1],'X',color=COL[c],ms=11,zorder=4)
     print(c,res['outcome'])
 ax.set_aspect('equal'); ax.set_xlim(-16,18); ax.set_ylim(-9,8)
-ax.set_xlabel('x / R'); ax.set_ylabel('y / R'); ax.legend(frameon=False,loc='lower left',fontsize=12)
+ax.set_xlabel(r'$x/R$'); ax.set_ylabel(r'$y/R$'); ax.legend(frameon=False,loc='lower left',fontsize=18)
 fig.savefig(out('orientation_trajectories.pdf')); plt.close(fig)
 
 # barrier heights for the record
