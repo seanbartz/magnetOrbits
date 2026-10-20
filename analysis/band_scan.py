@@ -8,7 +8,7 @@ Usage
     python analysis/band_scan.py numerics        # tightened-numerics recount at the anti-line point
     python analysis/band_scan.py survey          # exponents at window points spread across the band
     python analysis/band_scan.py analyze         # band measures, checks, summary, figures
-    python analysis/band_scan.py all             # the three above
+    python analysis/band_scan.py all             # every mode above, in order (strips first: hours)
     python analysis/band_scan.py save-reference  # summary + band maps -> tests/reference/
 
 Strips (sweep.py --strip mirror; phi1 = s, phi2 = pi - s + d), per energy E in ENERGIES:
@@ -397,9 +397,20 @@ STORES = {"exponents": ("exponents.json", exponent_jobs, SAMPLES),
 POINT_FIELDS = ("kind", "b_lo", "b_hi", "phi1", "phi2", "m", "m1", "m2")
 
 
+def same_value(a, b):
+    """Equal, with floats (also inside lists) compared to rel 1e-12: the anti-line interval comes from a
+    fresh bisection, which may differ in the last bit across platforms."""
+    if isinstance(a, float) and isinstance(b, float):
+        return bool(np.isclose(a, b, rtol=1e-12, atol=0.0))
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(same_value(x, y) for x, y in zip(a, b))
+    return a == b
+
+
 def matches(stored, point, settings, samples):
-    """Whether a stored exponent entry was computed for exactly this point, settings and sample size."""
-    return (all(stored.get(f) == point.get(f) for f in POINT_FIELDS) and stored.get("settings") == settings
+    """Whether a stored exponent entry was computed for this point, settings and sample size."""
+    return (all(same_value(stored.get(f), point.get(f)) for f in POINT_FIELDS)
+            and isinstance(stored.get("settings"), dict) and energy_scan.same_settings(stored["settings"], settings)
             and stored.get("samples") == samples)
 
 
@@ -474,7 +485,7 @@ def load_store(store_name, runs):
 
 
 NUMERICS_ENERGY = 0.002
-NUMERICS_EPS = [1e-4, 1e-5, 1e-6]
+NUMERICS_EPS = uncertainty.NUMERICS_EPS
 
 
 def run_numerics(workers=min(18, os.cpu_count() or 1), samples=20000, seed=11):
@@ -483,12 +494,12 @@ def run_numerics(workers=min(18, os.cpu_count() or 1), samples=20000, seed=11):
     The antiparallel family is invariant but not integrable; at low energy its outer edge carries
     fine structure (alpha < 1). If that structure is dynamical, rtol 1e-12 and a doubled r0 give
     Poisson-consistent uncertain counts (individual near-boundary outcomes may flip); if integration
-    error decided outcomes, tightening would change the counts systematically.
+    error decided outcomes, tightening would change the counts systematically. The point is the one
+    the current rules generate (control_points), so a stale exponents.json entry cannot leak in.
     """
-    store = json.loads((RESULTS / "exponents.json").read_text())["points"]
-    point = store[f"{NUMERICS_ENERGY:.6g}/control_anti"]
-    base = {"start_radius": energy_scan.scan_settings(NUMERICS_ENERGY)["start_radius"], "method": "numba"}
-    variants = {"production": {}, "rtol 1e-12": {"rtol": 1e-12, "atol": 1e-14},
+    point = control_points(NUMERICS_ENERGY, strip_settings(NUMERICS_ENERGY))["control_anti"]
+    base = point_settings(NUMERICS_ENERGY)
+    variants = {"production": {}, "rtol 1e-12": uncertainty.NUMERICS_VARIANTS["rtol 1e-12"],
                 "2 r0": {"start_radius": 2 * base["start_radius"]}}
     m1, m2 = moments(point)
     centers, eps, b_all = sample_points(point["b_lo"], point["b_hi"], NUMERICS_EPS, samples, seed)
@@ -602,7 +613,8 @@ def analyze():
         pts = {k.split("/", 1)[1]: v for k, v in exps.items() if k.split("/", 1)[0] == f"{e:.6g}"}
         band_alphas = [v["alpha"] for k, v in pts.items() if v["kind"] == "band"]
         surv = {k.split("/", 1)[1]: v for k, v in survey.items() if k.split("/", 1)[0] == f"{e:.6g}"}
-        surv_alpha = [v["alpha"] for v in surv.values()]
+        surv_all = [v["alpha"] for v in surv.values()]
+        surv_alpha = [a for a in surv_all if np.isfinite(a)]       # nan: too few uncertain counts to fit
         row = {"energy": e, **{k: v for k, v in m.items() if k != "rows"}, "rows": m["rows"],
                "production_windows": int(np.sum(base["n_intervals"] >= 2)),
                "scan_refinement": scan_refinement(base, fine),
@@ -611,6 +623,7 @@ def analyze():
                "survey": {k: exponent_summary(k, v) for k, v in surv.items()},
                "survey_fractal_share": (sum(a < FRACTAL_ALPHA for a in surv_alpha) / len(surv_alpha)) if surv_alpha else None,
                "survey_alpha_min": min(surv_alpha) if surv_alpha else None,
+               "survey_unfit": len(surv_all) - len(surv_alpha),
                "git_hashes": sorted({runs[n]["meta"]["git_hash"] for n in (f"band_E{e:.6g}", f"band_E{e:.6g}_scan4")}),
                "git_dirty": any(runs[n]["meta"]["git_dirty"] or runs[n]["meta"].get("git_mixed", False)
                                 for n in (f"band_E{e:.6g}", f"band_E{e:.6g}_scan4"))}
@@ -655,7 +668,7 @@ def exponent_summary(name, v):
 
 def fits(per_energy):
     """Power law of the sharp edge's distance from the mirror line at low energy (E < 0.05)."""
-    low = [r for r in per_energy if r["energy"] < 0.05]
+    low = [r for r in per_energy if r["energy"] < 0.05 and r["sharp_edge"] < 0]     # log of the distance below
     x, y = np.log([r["energy"] for r in low]), np.log([-r["sharp_edge"] for r in low])
     slope, intercept = np.polyfit(x, y, 1)
     return {"sharp_edge_low_E": {"exponent": float(slope), "prefactor_pi": float(np.exp(intercept)),
@@ -683,10 +696,13 @@ def run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirt
                    f"{len(ctrl)} controls, alpha {min(v['alpha'] for *_, v in ctrl):.3f}-{max(v['alpha'] for *_, v in ctrl):.3f}; "
                    f"outside max(3 sigma, 0.05): {bad}"))
     variants = numerics["variants"]
-    checks.append(("anti-line structure is dynamical", numerics_consistent(numerics),
+    anti = exps[f"{numerics['energy']:.6g}/control_anti"]
+    current = all(same_value(float(numerics[f]), float(anti[f])) for f in ("b_lo", "b_hi"))
+    checks.append(("anti-line structure is dynamical", numerics_consistent(numerics) and current,
                    f"E = {numerics['energy']}: uncertain counts " + "; ".join(
                        f"{k} {v['uncertain']}" for k, v in variants.items())
-                   + f" of {variants['production']['totals'][0]} (within 4 sigma of production)"))
+                   + f" of {variants['production']['totals'][0]} (within 4 sigma of production); "
+                   f"recount on the current control_anti interval: {current}"))
     # (3) 4x scan: no row's sharp edge moves; b_out is unchanged except (a) next to window points,
     # where the 4x scan finds a contact sliver above the production edge, and (b) rare points whose
     # outer edge itself is fractal. The 16x scan must confirm the 4x b_out at the moved points,
@@ -699,13 +715,15 @@ def run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirt
                   if r["scan_refinement"]["sharp_edge_rows_moved"]}
     unconfirmed = [(p["energy"], p["i"], p["j"]) for p in slivers["points"]
                    if p["b_out_16x"] is None or abs(p["b_out_16x"] / p["b_out_4x"] - 1) > B_OUT_TOLERANCE]
-    covered = len(slivers["points"]) == n_moved
+    moved_keys = {(r["energy"], i, j) for r in per_energy for i, j in r["scan_refinement"]["b_out_moved"]}
+    covered = (slivers.get("factor") == SLIVER_FACTOR and len(slivers["points"]) == n_moved
+               and {(p["energy"], p["i"], p["j"]) for p in slivers["points"]} == moved_keys)
     checks.append(("4x scan: b_out, sharp edge", not rows_moved and covered
                    and len(unconfirmed) <= MAX_UNCONVERGED_SHARE * n_points,
                    f"b_out moved by > {B_OUT_TOLERANCE:.0e} at {n_moved}/{n_points} points ({n_sliver} contact slivers "
                    f"next to windows, {n_moved - n_sliver} other); 16x confirms the 4x b_out at "
                    f"{len(slivers['points']) - len(unconfirmed)}/{len(slivers['points'])} (not at {unconfirmed}); "
-                   f"rows with a moved sharp edge: {rows_moved}"))
+                   f"rows with a moved sharp edge: {rows_moved}; slivers.json covers exactly the moved points: {covered}"))
     # (4) closing.
     open_ = next(r for r in per_energy if r["energy"] == LAST_OPEN_ENERGY)
     closed = next(r for r in per_energy if r["energy"] == CLOSED_ENERGY)
@@ -722,7 +740,7 @@ def run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirt
         n, mism, worst = compare_with_torus(runs[f"band_E{e:.6g}"], escan)
         ok5 &= n > 0 and mism == 0 and worst < 2e-6
         details.append(f"{e:g}: {n} pts, {mism} mismatches, {worst:.0e}")
-    checks.append(("strip vs 32x32 maps (6a)", ok5, "; ".join(details)))
+    checks.append(("strip vs 32x32 maps (6a)", ok5 and bool(details), "; ".join(details) or "no common energies"))
     # Range, and provenance.
     at_end = [r["energy"] for r in per_energy if r["windows_at_range_end"]]
     checks.append(("band inside the d range", not at_end, f"energies with windows at a range end: {at_end}"))
@@ -814,6 +832,12 @@ def save_reference():
     if not all(c["pass"] for c in summary["checks"]):
         raise SystemExit("band-scan checks did not all pass; not storing a reference")
     runs = load_runs()
+    stale = [r["energy"] for r in summary["per_energy"]
+             if r["git_hashes"] != sorted({runs[n]["meta"]["git_hash"]
+                                           for n in (f"band_E{r['energy']:.6g}", f"band_E{r['energy']:.6g}_scan4")})
+             or r["n_window_points"] != int(np.sum(runs[f"band_E{r['energy']:.6g}_scan4"]["n_intervals"] >= 2))]
+    if stale:
+        raise SystemExit(f"summary.json does not match the current runs at E = {stale}; rerun `band_scan.py analyze`")
     arrays = {}
     for e in ENERGIES:
         d = runs[f"band_E{e:.6g}_scan4"]

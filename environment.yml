@@ -1,0 +1,19 @@
+# Conda environment for magnetOrbits (physics code + progress notebook).
+# Create:   conda env create -f environment.yml
+# Kernel:   conda activate magnetorbits && python -m ipykernel install --user --name magnetorbits --display-name "Python (magnetorbits)"
+# Update:   conda env update -f environment.yml --prune
+name: magnetorbits
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy>=1.21
+  - scipy>=1.9
+  - matplotlib>=3.5
+  - numba>=0.55
+  # notebook extras (pyproject.toml [notebook]); tests/ imports pytest
+  - jupyterlab
+  - nbconvert>=6
+  - ipykernel
+  - ipywidgets>=7
+  - pytest

@@ -119,6 +119,7 @@ def test_stored_entries_reused_only_for_the_same_point():
     settings = {"start_radius": 64000.0, "method": "numba"}
     stored = {**point, "settings": settings, "samples": 20000, "alpha": 0.3}
     assert matches(stored, point, settings, 20000)
+    assert matches(stored, {**point, "b_hi": np.nextafter(1.3, 2.0)}, settings, 20000)   # last-bit bisection noise
     assert not matches(stored, {**point, "b_hi": 1.31}, settings, 20000)
     assert not matches(stored, point, {**settings, "start_radius": 128000.0}, 20000)
     assert not matches(stored, point, settings, 50000)

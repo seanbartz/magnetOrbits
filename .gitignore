@@ -12,3 +12,10 @@ results/
 # figures are committed as PDF; PNG copies are local previews
 figures/*.png
 .DS_Store
+
+# upper-edge chaos study outputs
+upper_edge_chaos_scripts/data/
+upper_edge_chaos_scripts/output/
+
+# jupyterlab-lsp shadow copies
+notebooks/.virtual_documents/
