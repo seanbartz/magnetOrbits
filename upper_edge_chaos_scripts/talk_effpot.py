@@ -24,7 +24,7 @@ r=np.linspace(2,14,2000)
 fig,ax=plt.subplots(figsize=(8.5,5.4))
 ax.axvspan(1.6,2,color='#000',alpha=0.08,lw=0)
 lab={'locked':'locked head-to-tail (with spin)','anti':'out of plane, antiparallel','par':'out of plane, parallel'}
-for c in ['locked','anti','par']:
+for c in ['locked','anti']:
     u=ueff(r,c)/E; ax.plot(r,u,color=COL[c],lw=2.2,label=lab[c])
     k=np.argmax(u);
     if 0<k<len(r)-1: ax.plot(r[k],u[k],'o',color=COL[c],ms=6)
@@ -36,8 +36,7 @@ fig.savefig(out('effective_potential.pdf')); plt.close(fig)
 
 # ---------------- trajectories at the same (E, b) ----------------
 cases=[('locked','head-to-tail',(1,0,0),(1,0,0)),
-       ('anti','out of plane, antiparallel',(0,0,1),(0,0,-1)),
-       ('par','out of plane, parallel',(0,0,1),(0,0,1))]
+       ('anti','out of plane, antiparallel',(0,0,1),(0,0,-1))]
 fig,ax=plt.subplots(figsize=(8.5,6))
 ax.add_patch(plt.Circle((0,0),2,fc='#eee',ec='#999',zorder=1))
 for c,name,m1,m2 in cases:
@@ -49,10 +48,10 @@ for c,name,m1,m2 in cases:
     ax.plot(y[0,keep],y[1,keep],color=COL[c],lw=2.2,label=f"{name}: {res['outcome']}",zorder=3)
     if res['outcome']=='contact': ax.plot(y[0,-1],y[1,-1],'X',color=COL[c],ms=11,zorder=4)
     print(c,res['outcome'])
-ax.set_aspect('equal'); ax.set_xlim(-16,22); ax.set_ylim(-8,12)
+ax.set_aspect('equal'); ax.set_xlim(-16,18); ax.set_ylim(-9,8)
 ax.set_xlabel('x / R'); ax.set_ylabel('y / R'); ax.legend(frameon=False,loc='lower left',fontsize=12)
 fig.savefig(out('orientation_trajectories.pdf')); plt.close(fig)
 
 # barrier heights for the record
-for c in ['locked','anti','par']:
+for c in ['locked','anti']:
     u=ueff(r,c); k=np.argmax(u); print(c,'max U_eff/E = %.3f at r = %.2f'%(u[k]/E,r[k]))
