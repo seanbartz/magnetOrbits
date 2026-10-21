@@ -11,7 +11,8 @@ Examples
 
 Output (all dimensionless: length R, energy U0 = mu0 mu^2 / 4 pi R^3, time t0):
 outcome, closest approach, deflection angle, conservation drifts, and, for configurations
-that reduce to a central -kappa/r^3 force, the analytic/quadrature baseline.
+that reduce to a central -kappa/r^3 force, the analytic/quadrature baseline (for head-to-tail,
+the locked law with the spin of the co-rotating moments included).
 
 Program flow
 ------------
@@ -35,7 +36,8 @@ PRESETS = {
     # Exact too, repulsive U = +1/r^3.
     "parallel-z": ((0, 0, 1), (0, 0, 1), -1.0),
     # Head-to-tail along the incoming direction (the paper's initial condition). NOT a
-    # central problem: the moments rotate. The locked limit kappa = 2 is printed for reference.
+    # central problem: the moments rotate. The locked law (moments co-rotating along r_hat,
+    # spin included; its E -> 0 limit) is printed for reference.
     "head-to-tail": ((1, 0, 0), (1, 0, 0), 2.0),
 }
 
@@ -100,12 +102,18 @@ def main():
 
     if kappa is not None:
         print("-" * 72)
-        exact = args.preset in ("antiparallel-z", "parallel-z")
-        label = "exact reduction" if exact else "locked-dipole limit only (moments rotate)"
-        b_c = central.capture_impact_parameter(args.energy, kappa) if kappa > 0 else float("nan")
-        theta = central.deflection_angle(args.energy, args.b, kappa)
-        r_turn = central.turning_point(args.energy, args.b, kappa)
-        print(f"central -kappa/r^3 baseline, kappa = {kappa:g}  [{label}]")
+        if args.preset == "head-to-tail":
+            inertia = params.inertia_tilde
+            b_c = central.locked_capture_impact_parameter(args.energy, inertia)
+            theta = central.locked_deflection_angle(args.energy, args.b, inertia)
+            r_turn = central.locked_turning_point(args.energy, args.b, inertia)
+            print(f"locked head-to-tail law, spin included (I_tilde = {inertia:g})  "
+                  "[adiabatic limit only: the moments rotate freely]")
+        else:
+            b_c = central.capture_impact_parameter(args.energy, kappa) if kappa > 0 else float("nan")
+            theta = central.deflection_angle(args.energy, args.b, kappa)
+            r_turn = central.turning_point(args.energy, args.b, kappa)
+            print(f"central -kappa/r^3 baseline, kappa = {kappa:g}  [exact reduction]")
         print(f"  b_c (collision edge)  {b_c:.10f}")
         print(f"  turning point         {r_turn:.10f}")
         print(f"  deflection (quad)     {theta:.12f} rad   (ours - quad = {res['deflection'] - theta:.2e})")

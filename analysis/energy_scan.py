@@ -20,8 +20,14 @@ stage 8); sigma_meas = 2 <capture measure + b_min [b_min collides]>, which uses 
 (phi -> pi - phi, a measure-preserving map of the torus). In the fractal window band the capture
 measure is converged only to a few percent (stage 8), so sigma_meas carries that uncertainty.
 
+Reference laws (physics/central.py): the locked head-to-tail law with the spin of the co-rotating
+moments included, b_c^locked = locked_capture_impact_parameter(E) (the adiabatic limit of free
+head-to-tail magnets), and the exact +z/-z law (kappa = 1).
+
 Scaling rules (scan_settings):
-  b_max = max(10, 2 b_c^locked(E))   the locked edge reaches 17 R at E = 1e-3;
+  b_max = max(10, 2 b_c^spin-free(E)) b_c^spin-free is the -2/r^3 edge with the spin ignored. This rule
+                                     is fixed by the stored runs; the locked edge is at most 1.21 times
+                                     b_c^spin-free, so the scan covers it (it reaches 17.5 R at E = 1e-3);
   n_scan so that db = (b_max - b_min)/(n_scan - 1) ~ 0.05 (the validated torus-map spacing);
   r0 = max(1000, 64000 E_paper / E)  in-state error ~ (1/(I E r0))^2: hold E r0 at its validated
                                      value (r0 = 64000 at the paper energy); 1000 is the stage-2
@@ -34,12 +40,14 @@ outer edge with no contact at the top of the scan (otherwise b_max was too small
 underestimated).
 
 Checks (analyze): +z/-z edge vs analytic on both branches; head-to-tail b_out/b_locked -> 1
-monotonically as E -> 0; b_out -> 2 monotonically as E -> infinity with (b_out^2 - 4) E settling to
+monotonically as E -> 0, reaching the edge bisection tolerance at the lowest energy; no orientation
+collides beyond the locked edge; b_out -> 2 monotonically as E -> infinity with (b_out^2 - 4) E settling to
 a constant; at the paper energy the head-to-tail edge equals the stage-5 value
 (tests/validated.py) and the map agrees with tests/reference/map_torus32.npz;
 provenance: every run clean and unmixed, the analysis tree (runtime code plus ANALYSIS_PATHS)
-clean, and the runtime code
-(sweep.RUNTIME_PATHS) identical at every run's commit and at the analysis commit.
+clean, and the runtime code (runtime_pathspec(): sweep.RUNTIME_PATHS without the analytic oracle
+physics/central.py, which no trajectory code imports) identical at every run's commit and at the
+analysis commit.
 Output: results/energy_scan/summary.json, figures/energy_scan_*.pdf (plus .png previews, gitignored).
 """
 
@@ -73,6 +81,7 @@ Z = np.array([0.0, 0.0, 1.0])
 
 def scan_settings(energy):
     """b_max, n_scan and r0 for one energy (see module docstring)."""
+    # Fixed by the stored runs: twice the spin-free -2/r^3 edge (covers the locked edge, <= 1.21x).
     b_max = max(10.0, 2.0 * central.capture_impact_parameter(energy, 2.0))
     n_scan = int(round((b_max - B_MIN) / DB_TARGET)) + 1
     start_radius = max(1000.0, 64000.0 * E_PAPER / energy)
@@ -197,12 +206,13 @@ def analyze(workers=min(18, os.cpu_count() or 1)):
         meta = data["meta"]
         stats = weighted_stats(data["records"], N_PHI)
         b_ht = data["records"][(0, 0)]["outer_edge"]
-        b_locked = central.capture_impact_parameter(energy, 2.0)
+        b_locked = central.locked_capture_impact_parameter(energy)
         zz = zz_edges[energy]
         zz_exact = central.capture_impact_parameter(energy, 1.0)
         rows.append({"energy": energy, **cfg, "run": run_name(energy), "git_hash": meta["git_hash"],
                      "git_dirty": meta["git_dirty"] or meta.get("git_mixed", False),
                      "b_head_to_tail": b_ht, "b_locked": b_locked, "ratio_locked": b_ht / b_locked,
+                     "b_spin_free": central.capture_impact_parameter(energy, 2.0),
                      "b_zz": zz, "b_zz_exact": zz_exact, "zz_rel_err": abs(zz / zz_exact - 1), **stats,
                      "sigma_locked": 2 * b_locked})
         r = rows[-1]
@@ -233,12 +243,18 @@ def run_checks(rows, paper_map, analysis_head, analysis_dirty):
     checks = []
     zz = max(r["zz_rel_err"] for r in rows)
     checks.append(("+z/-z edge vs analytic", zz < 2e-6, f"max rel err {zz:.1e} over {len(rows)} energies (both branches)"))
-    # Slow limit: the deviation from the locked law shrinks at every step down in energy, and is
-    # below 1% at the lowest energy.
+    # Slow limit: the deviation from the locked law (spin included) shrinks at every step down in
+    # energy, and is within the edge bisection tolerance (REL_TOL) at the lowest energy.
     low = sorted(rows, key=lambda r: r["energy"])[:4]
     dev = [abs(r["ratio_locked"] - 1) for r in low]
-    checks.append(("adiabatic limit E -> 0", bool(np.all(np.diff(dev) > 0)) and dev[0] < 0.01,
-                   "b_out/b_locked - 1 = " + ", ".join(f"{r['ratio_locked'] - 1:+.4f}@{r['energy']:g}" for r in low)))
+    checks.append(("adiabatic limit E -> 0", bool(np.all(np.diff(dev) > 0)) and dev[0] < 2 * REL_TOL,
+                   "b_out/b_locked - 1 = " + ", ".join(f"{r['ratio_locked'] - 1:+.1e}@{r['energy']:g}" for r in low)))
+    # No in-plane orientation collides beyond the locked edge (within the bisection tolerance).
+    over = [(r["energy"], r["b_out_max"] / r["b_locked"] - 1) for r in rows if r["b_out_max"] > r["b_locked"] * (1 + 2 * REL_TOL)]
+    worst = max(rows, key=lambda r: r["b_out_max"] / r["b_locked"])
+    checks.append(("locked edge is the maximum", not over,
+                   f"max over orientations / locked: largest {worst['b_out_max'] / worst['b_locked']:.7f} at E = "
+                   f"{worst['energy']:g}; above locked: {over}"))
     # Fast limit: b_out - 2 falls at every step up in energy, and (b^2 - 4) E settles monotonically
     # to a constant (spread across the top four energies below 30%).
     high = sorted(rows, key=lambda r: r["energy"])[-4:]
@@ -281,15 +297,25 @@ def provenance(rows, analysis_head, analysis_dirty):
     recomputes edges (the +z/-z check) from the working tree, so that must be clean too. A run
     commit missing from the local history (a shallow clone) counts as differing.
     """
-    import sweep
     dirty = [r["energy"] for r in rows if r["git_dirty"]]
     hashes = sorted({r["git_hash"] for r in rows})
     changed = [h[:8] for h in hashes
-               if subprocess.run(["git", "diff", "--quiet", h, analysis_head, "--", *sweep.RUNTIME_PATHS],
+               if subprocess.run(["git", "diff", "--quiet", h, analysis_head, "--", *runtime_pathspec()],
                                  cwd=ROOT, stderr=subprocess.DEVNULL).returncode != 0]
     detail = (f"dirty or mixed runs: {dirty}; analysis tree dirty: {analysis_dirty}; run commits "
               f"{[h[:8] for h in hashes]}; runtime code differs from {analysis_head[:8]} at: {changed}")
     return not dirty and not analysis_dirty and not changed, detail
+
+
+# physics/central.py is the analytic oracle (power laws, locked law): no trajectory code imports it
+# (tests/test_energy_scan.py checks this), so a change there does not invalidate stored runs.
+NON_RUNTIME_ORACLES = ("physics/central.py",)
+
+
+def runtime_pathspec():
+    """git pathspec of the code that computes trajectories: sweep.RUNTIME_PATHS minus the oracle."""
+    import sweep
+    return [*sweep.RUNTIME_PATHS, *(f":(exclude){p}" for p in NON_RUNTIME_ORACLES)]
 
 
 # Everything the analysis reads besides the runtime code (sweep.RUNTIME_PATHS) and the runs.
@@ -310,11 +336,13 @@ def make_figures(rows):
                          "ytick.labelsize": 13, "axes.grid": False, "legend.frameon": False})
     E = np.array([r["energy"] for r in rows])
     fine = np.geomspace(E.min(), E.max(), 400)
-    locked = np.array([central.capture_impact_parameter(e, 2.0) for e in fine])
+    locked = np.array([central.locked_capture_impact_parameter(e) for e in fine])
+    spin_free = np.array([central.capture_impact_parameter(e, 2.0) for e in fine])
     zz = np.array([central.capture_impact_parameter(e, 1.0) for e in fine])
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5.2))
-    ax1.loglog(fine, locked, "C1-", label=r"locked head-to-tail ($\kappa=2$)")
+    ax1.loglog(fine, locked, "C1-", label="locked head-to-tail (spin included)")
+    ax1.loglog(fine, spin_free, "C1:", lw=1, label=r"$-2/r^3$, spin ignored")
     ax1.loglog(fine, zz, "C0-", label=r"$+z/-z$ ($\kappa=1$, exact)")
     ax1.axhline(2.0, color="0.5", ls=":", label="contact, $b=2R$")
     ax1.loglog(E, [r["b_head_to_tail"] for r in rows], "ko", mfc="none", label="free rotors, head-to-tail")
@@ -326,8 +354,7 @@ def make_figures(rows):
     ax2.fill_between(E, [r["b_out_min"] / r["b_locked"] for r in rows], [r["b_out_max"] / r["b_locked"] for r in rows],
                      color="C2", alpha=0.15, label="range over orientations")
     ax2.axhline(1.0, color="C1", lw=1)
-    for e_star in (1 / 16, 1 / 8):
-        ax2.axvline(e_star, color="0.7", lw=1, ls="--")
+    ax2.axvline(central.locked_crossover_energy(), color="0.7", lw=1, ls="--")   # locked crossover 0.275
     ax2.set_xlabel(r"$\tilde E$"); ax2.set_ylabel(r"$b/b_c^{\rm locked}$"); ax2.legend(fontsize=11)
     fig.tight_layout()
     for ext in ("pdf", "png"):

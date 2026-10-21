@@ -13,7 +13,7 @@ Usage
 
 Strips (sweep.py --strip mirror; phi1 = s, phi2 = pi - s + d), per energy E in ENERGIES:
   * results/band_E<E>/        production: the stage-6a settings for E (energy_scan.sweep_settings:
-                              b_max = max(10, 2 b_c^locked), db ~ 0.05, r0 = max(1000, 64000 E_paper/E));
+                              b_max = max(10, 2 b_c^spin-free), db ~ 0.05, r0 = max(1000, 64000 E_paper/E));
   * results/band_E<E>_scan4/  the same strip with a 4x finer b scan; band statistics use this run,
                               since thin windows sit below the production scan (stage 8c);
   * results/band_E0.35_fine/  the closing check: 4x finer d step (pi/2048), 16 rows including the
@@ -749,14 +749,13 @@ def run_checks(per_energy, runs, exps, slivers, numerics, fine_close, head, dirt
 
 
 def provenance(runs, exps, slivers, numerics, head, dirty):
-    import sweep
     run_dirty = [n for n, d in runs.items() if d["meta"]["git_dirty"] or d["meta"].get("git_mixed", False)]
     exp_dirty = (sorted({k for k, v in exps.items() if v["git_dirty"]}) + (["slivers"] if slivers["git_dirty"] else [])
                  + (["numerics"] if numerics["git_dirty"] else []))
     hashes = sorted({d["meta"]["git_hash"] for d in runs.values()} | {v["git_hash"] for v in exps.values()}
                     | {slivers["git_hash"], numerics["git_hash"]})
     changed = [h[:8] for h in hashes
-               if subprocess.run(["git", "diff", "--quiet", h, head, "--", *sweep.RUNTIME_PATHS],
+               if subprocess.run(["git", "diff", "--quiet", h, head, "--", *energy_scan.runtime_pathspec()],
                                  cwd=ROOT, stderr=subprocess.DEVNULL).returncode != 0]
     detail = (f"dirty runs {run_dirty}; dirty exponents {exp_dirty[:3]}{'...' if len(exp_dirty) > 3 else ''}; "
               f"analysis tree dirty {dirty}; commits {[h[:8] for h in hashes]}; runtime code differs at {changed}")

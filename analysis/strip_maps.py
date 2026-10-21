@@ -64,7 +64,7 @@ def figures(result_dir, out_dir=None):
     rows = np.unique(np.linspace(0, len(along) - 1, 5).astype(int)[1:-1]) if len(along) > 2 else np.arange(len(along))
     for k in rows:
         ax.plot(across, data["outer_edge"][k], "-", lw=1.5, label=fr"$s={along[k]:.3f}\pi$")
-    ax.axhline(central.capture_impact_parameter(data["meta"]["settings"]["energy"], 2.0), color="0.4", ls=":", lw=1)
+    ax.axhline(central.locked_capture_impact_parameter(data["meta"]["settings"]["energy"]), color="0.4", ls=":", lw=1)
     ax.set_xlabel(AXIS_LABEL[line]); ax.set_ylabel(r"$b_{\rm out}/R$"); ax.legend(fontsize=11)
     fig.tight_layout()
     path = out_dir / f"{name}_profiles.pdf"

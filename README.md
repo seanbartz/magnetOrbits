@@ -61,7 +61,8 @@ analysis/delta_phi.py   stored maps re-indexed to (phi1, dphi = phi2 - phi1) and
 upper_edge_chaos_scripts/   exploratory: regular vs fractal window edge in the
                             mirror band at s = pi/4 (see its README)        (stage 9)
 physics/capture.py   bisection for the contact/escape edge b_c           (stage 3)
-physics/central.py   independent -kappa/r^3 oracle: b_c, quadrature Theta  (stages 2-3)
+physics/central.py   independent -kappa/r^3 oracle: b_c, quadrature Theta  (stages 2-3);
+                     locked head-to-tail law with the co-rotating spin (locked_*)
 ```
 
 Every later sweep calls `physics.solve.run_trajectory`, so any sweep point can be
