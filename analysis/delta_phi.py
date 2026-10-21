@@ -164,12 +164,27 @@ def overlay_lines(ax, coords, color="w", which=("mirror", "antiparallel", "paral
         ax.set_xlim(x0, x1); ax.set_ylim(y0, y1)
 
 
-def line_legend(fig, color="k", loc="outside lower center", **kw):
-    """Figure legend (below the panels; needs layout="constrained") naming the three line styles."""
+def line_legend(fig, color="k", **kw):
+    """Legend below the panels naming the three line styles. Needs layout="constrained"; call it
+    after the axes are labeled."""
+    import matplotlib
     from matplotlib.lines import Line2D
+    from matplotlib.transforms import offset_copy
     handles = [Line2D([], [], color=color, **style) for _, style in LINES.values()]
     labels = [r"mirror $\phi_1+\phi_2=\pi$", r"antiparallel $\Delta\phi=\pi$", r"parallel $\Delta\phi=0$"]
-    return fig.legend(handles, labels, loc=loc, ncol=3, frameon=False, **kw)
+    if tuple(int(p) for p in matplotlib.__version__.split(".")[:2]) >= (3, 7):
+        return fig.legend(handles, labels, loc="outside lower center", ncol=3, frameon=False, **kw)
+    # matplotlib < 3.7 has no "outside" placement, and its constrained layout ignores figure legends.
+    # Hang the legend under the bottom-center panel instead, below its tick and axis labels, so the
+    # layout makes room for it as part of that axes.
+    panels = [ax for ax in fig.axes if getattr(ax, "get_subplotspec", lambda: None)() is not None]
+    bottom = max(ax.get_subplotspec().rowspan.stop for ax in panels)
+    row = [ax for ax in panels if ax.get_subplotspec().rowspan.stop == bottom]
+    ax = min(row, key=lambda a: abs(a.get_position().x0 + a.get_position().width / 2 - 0.5))
+    below = ax.bbox.y0 - ax.xaxis.get_tightbbox(fig.canvas.get_renderer()).y0     # pixels
+    anchor = offset_copy(ax.transAxes, fig=fig, y=-below * 72 / fig.dpi, units="points")
+    return ax.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0), bbox_transform=anchor,
+                     ncol=3, frameon=False, **kw)
 
 
 def pi_label(k, den):
