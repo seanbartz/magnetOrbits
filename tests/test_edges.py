@@ -113,6 +113,34 @@ def test_regression_against_production_map():
         assert rec["capture_measure"] == pytest.approx(ref["capture_measure"][i, j], rel=1e-9)
 
 
+def test_fine_map_contains_production_map():
+    """Every 8th point of the 256 x 256 numba map lies on the 32 x 32 grid and must reproduce it."""
+    from pathlib import Path
+    ref_dir = Path(__file__).parent / "reference"
+    coarse, fine = np.load(ref_dir / "map_torus32.npz"), np.load(ref_dir / "map_torus256.npz")
+    assert json.loads(str(fine["settings"]))["method"] == "numba"
+    np.testing.assert_array_equal(fine["n_intervals"][::8, ::8], coarse["n_intervals"])
+    np.testing.assert_allclose(fine["outer_edge"][::8, ::8], coarse["outer_edge"], rtol=2e-6)
+    np.testing.assert_allclose(fine["capture_measure"][::8, ::8], coarse["capture_measure"], rtol=2e-6)
+
+
+def test_fine_map_at_crossover_energy_against_band_strip():
+    """The 256 x 256 map at E = 1/8 against the stage-9 mirror strip (4x b scan) on their shared
+    points: b_out never above the strip, and below it only where the 4x scan finds a contact sliver."""
+    from pathlib import Path
+    ref_dir = Path(__file__).parent / "reference"
+    fine, band = np.load(ref_dir / "map_torus256_E0.125.npz"), np.load(ref_dir / "band_maps.npz")
+    assert json.loads(str(fine["settings"]))["energy"] == 0.125
+    along, across = band["E0.125__along"], band["E0.125__across"] * 128 / np.pi
+    shared = np.nonzero(np.abs(across - np.rint(across)) < 1e-9)[0]
+    i = np.rint(along * 128 / np.pi).astype(int)[:, None]
+    j = (128 - i + np.rint(across[shared]).astype(int)[None, :]) % 256
+    ours, strip = fine["outer_edge"][i, j], band["E0.125__outer_edge"][:, shared]
+    assert ours.size == 2080
+    assert np.all((ours - strip) / strip <= 2e-6)
+    assert np.sum((strip - ours) / strip > 2e-6) <= 6
+
+
 # --- undecided (timeout) handling and sweep bookkeeping (PR #4 review) ----------------------
 
 def scripted_outcomes(monkeypatch, rule):

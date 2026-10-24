@@ -262,6 +262,57 @@ bounded below by $-6/r^4$ over all orientations; the centrifugal term only helps
   Both are narrower than the grid (unresolved). 992/1024 orientations have one contact interval;
   the 32 in the trough ($\phi_1+\phi_2=15\pi/16$ and its flip image) have an escape window at
   $b\approx2.78$–$3.03$ inside the contact region. No timeouts, no contact at $b_{\max}=10$.
+- **Fine torus map** (2026-10-20, $256\times256$, numba, same settings as the $32\times32$ map;
+  `results/torus256_numba`, reference `tests/reference/map_torus256.npz`, figures
+  `figures/torus256_*.pdf`). 65536 points in 5.4 min on 18 workers. *Check:* every 8th point is
+  the $32\times32$ grid and reproduces `map_torus32.npz` exactly (`test_fine_map_contains_production_map`);
+  symmetry partners agree to $2.2\times10^{-6}$ (one orbit of 4 points just above the $2\times10^{-6}$
+  tolerance, 30/195584 comparisons above $10^{-6}$; bisection roundoff, no structure mismatches).
+  *Result:* the dip and trough are now visible as lines; the minimum is $2.656$ on the antiparallel
+  line near tail-to-tail, $(\phi_1,\phi_2)=(0.969\pi,1.969\pi)$ (the stage-8g patches, at finer
+  spacing, find $2.13$ nearby). Mean $5.564$, max $5.756$ unchanged; $2456/65536$ ($3.7\%$)
+  orientations have an escape window. Interpretation (from the edge lists; $d$ = offset below the
+  mirror line in cells of $\pi/128$):
+  - Off the two line families the map is a smooth plateau ($45\%$ of orientations within $1\%$ of
+    the maximum), so the coarse map's averages were already right.
+  - Antiparallel dip: $b_{\rm out}\approx4.72$ on the line, mirror-symmetric across it, rising
+    $\propto|d|^{0.52}$ between 1 and 4 cells (stage 8b: $0.57$).
+  - Mirror band: the escape window is born at $b=0$ on the mirror line and moves out linearly,
+    $b_w\approx0.35$ per cell ($\approx14R$ per radian), widening from $0.01$ at $d=-1$ to $0.37$ at
+    $d=-10$, while the outer contact piece above it shrinks ($5.35\to4.45$). The band's sharp low
+    edge is where that piece pinches off and $b_{\rm out}$ drops to the window's lower edge
+    ($4.45\to3.82$ at $s=\pi/2$).
+  - One-sidedness: reflection across the line of approach maps $(\phi_1,\phi_2,b)\to(-\phi_1,-\phi_2,-b)$,
+    i.e. $d\to-d$, $b\to-b$. In signed $b$ the window is one line $b\approx-\kappa d$ through $b=0$ on
+    the mirror line; $b\ge0$ shows only the $d<0$ half. Hypothesis (untested): it marks a balance
+    between orbital angular momentum and the spin from the orientation asymmetry.
+  - The minimum is the same pinch-off where the antiparallel dip crosses the band ($d=-8$), not a
+    deeper cusp; it sits on a jump, so its value depends on grid spacing (8g).
+- **Fine torus map at the crossover $\tilde E=1/8$** (2026-10-20, $256\times256$, numba, 6a/9
+  settings: $r_0=17152$, $b_{\max}=10$, $n_{\rm scan}=200$; `results/torus256_E0.125`, reference
+  `tests/reference/map_torus256_E0.125.npz`, figures `figures/torus256_E0.125_*.pdf`). Chosen as the
+  energy where head-to-tail beats the locked law most and the window band is widest (6a, 9).
+  4.6 min on 18 workers. *Checks:* the $32\times32$ subgrid reproduces the 6a map exactly; the 2080
+  points shared with the stage-9 strip reproduce its $n_{\rm scan}=200$ run exactly, and against its 4x
+  scan $b_{\rm out}$ is never higher and is lower at 6 points (contact slivers above the edge, as in 9),
+  so $b_{\rm out}$ is a lower bound there (`test_fine_map_at_crossover_energy_against_band_strip`).
+  10 points (3 symmetry orbits) have an undecided range $\le4\times10^{-4}$ wide at $b=1.0$–$1.4$, deep
+  inside the contact region: $b_{\rm out}$ is unaffected, the interval count is unknown (listed in the
+  npz). Symmetry partners: outer edges agree to $\le10^{-6}$; one orbit differs by $5.7\times10^{-6}$ at an
+  inner window edge ($b=0.80$). *Results* (compared with the paper energy):
+  - Max $3.913$ for parallel moments tilted $0.133\pi$ ($24^\circ$) from the approach axis, above
+    head-to-tail ($3.891=1.123\,b_c^{\rm locked}$); at the paper energy the tilted maximum is only
+    $0.02\%$ above head-to-tail. Mean $3.487$ ($1.007\,b_c^{\rm locked}$); only $11\%$ of
+    orientations are within $1\%$ of the maximum ($45\%$ at the paper energy): the plateau shrinks.
+  - The order of the two line families flips: the mirror line ($3.20$ at $s=\pi/2$) is now lower than
+    the antiparallel line ($3.27$); at the paper energy it was $5.35$ vs $4.72$.
+  - The window line through $b=0$ on the mirror line persists with a shallower slope,
+    $b_w\approx0.10$ per $\pi/128$ cell ($\approx4R$/rad, vs $14R$/rad), and the band reaches
+    $d=-15$ cells before the outer contact piece pinches off. $3398$ orientations ($5.2\%$, as in 9)
+    have one window and 8 (at the pinch-off edge) have two.
+  - Near tail-to-tail along the antiparallel line $b_{\rm out}$ falls from $2.62$ ($s=0.875\pi$) to
+    $0.41$ at $(0.977\pi,1.977\pi)$, where the line crosses the band: there almost every impact
+    parameter escapes. Exact tail-to-tail is $2.30$ with an escape window below $b=0.28$.
 
 - **Compiled integrator** (stage 7): `method="numba"` takes the same DOP853 steps as scipy
   (identical RHS-evaluation counts on 24 generic runs), end states agree to $\lesssim10^{-12}$,
